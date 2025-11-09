@@ -55,33 +55,41 @@ class ColoringPageMaker {
   }
 
   private async loadStamps(): Promise<void> {
-    // Define 13 stamp images to load
-    const stampFiles = [
-      { id: 'stamp1', name: 'Stamp 1', filename: '1.png' },
-      { id: 'stamp2', name: 'Stamp 2', filename: '2.png' },
-      { id: 'stamp3', name: 'Stamp 3', filename: '3.png' },
-      { id: 'stamp4', name: 'Stamp 4', filename: '4.png' },
-      { id: 'stamp5', name: 'Stamp 5', filename: '5.png' },
-      { id: 'stamp6', name: 'Stamp 6', filename: '6.png' },
-      { id: 'stamp7', name: 'Stamp 7', filename: '7.png' },
-      { id: 'stamp8', name: 'Stamp 8', filename: '8.png' },
-      { id: 'stamp9', name: 'Stamp 9', filename: '9.png' },
-      { id: 'stamp10', name: 'Stamp 10', filename: '10.png' },
-      { id: 'stamp11', name: 'Stamp 11', filename: '11.png' },
-      { id: 'stamp12', name: 'Stamp 12', filename: '12.png' },
-      { id: 'stamp13', name: 'Stamp 13', filename: '13.png' },
-    ];
+    // Load tilesheet metadata
+    const metadataResponse = await fetch(`${import.meta.env.BASE_URL}tilesheet.json`);
+    const metadata = await metadataResponse.json();
 
-    // Load all images
-    const imagePromises = stampFiles.map(async (stampFile) => {
+    // Load tilesheet image
+    const tilesheetImg = new Image();
+    const tilesheetLoadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+      tilesheetImg.onload = () => resolve(tilesheetImg);
+      tilesheetImg.onerror = reject;
+    });
+    tilesheetImg.src = `${import.meta.env.BASE_URL}tilesheet.png`;
+    await tilesheetLoadPromise;
+
+    // Extract each stamp from the tilesheet
+    const stamps = [];
+    for (const stampMeta of metadata.stamps) {
+      // Extract the stamp region from the tilesheet
+      const extractCanvas = document.createElement('canvas');
+      extractCanvas.width = stampMeta.width;
+      extractCanvas.height = stampMeta.height;
+      const extractCtx = extractCanvas.getContext('2d')!;
+      extractCtx.drawImage(
+        tilesheetImg,
+        stampMeta.x, stampMeta.y, stampMeta.width, stampMeta.height,
+        0, 0, stampMeta.width, stampMeta.height
+      );
+
+      // Convert canvas to image for compatibility with existing code
       const img = new Image();
-      const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+      const imgLoadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
         img.onload = () => resolve(img);
         img.onerror = reject;
       });
-      img.src = `${import.meta.env.BASE_URL}stamps/${stampFile.filename}`;
-
-      await loadPromise;
+      img.src = extractCanvas.toDataURL();
+      await imgLoadPromise;
 
       // Trim 50px from all sides to remove borders/margins
       const trimmedImage = this.trimImage(img, 50);
@@ -95,17 +103,17 @@ class ColoringPageMaker {
       // Use the maximum dimension of the processed image as the size
       const size = Math.max(processedImage.width, processedImage.height);
 
-      return {
-        id: stampFile.id,
-        name: stampFile.name,
+      stamps.push({
+        id: stampMeta.id,
+        name: stampMeta.filename.replace('.png', ''),
         size: size,
         image: img,
         thumbnail,
         processedImage,
-      };
-    });
+      });
+    }
 
-    this.stamps = await Promise.all(imagePromises);
+    this.stamps = stamps;
   }
 
   private trimImage(img: HTMLImageElement, trim: number): HTMLCanvasElement {
