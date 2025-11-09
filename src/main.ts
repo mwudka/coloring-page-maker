@@ -14,6 +14,7 @@ interface PlacedStamp {
   stamp: Stamp;
   x: number;
   y: number;
+  sizeMultiplier: number; // Random size variation (0.6 to 1.4)
 }
 
 class ColoringPageMaker {
@@ -29,6 +30,7 @@ class ColoringPageMaker {
   private starburstParticles: Array<{ x: number; y: number; vx: number; vy: number; life: number }> = [];
   private isRainbowAnimating: boolean = false;
   private isStarburstAnimating: boolean = false;
+  private currentSizeMultiplier: number = 1.0; // Random size variation for next stamp placement
 
   constructor() {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -276,10 +278,15 @@ class ColoringPageMaker {
           stamp: this.selectedStamp,
           x: this.previewPosition.x,
           y: this.previewPosition.y,
+          sizeMultiplier: this.currentSizeMultiplier,
         });
 
         // Play a silly sound
         this.playSillySound();
+
+        // Randomize size for next placement (+/- 40%)
+        // Range: 0.6 to 1.4 (60% to 140% of original)
+        this.currentSizeMultiplier = 0.6 + Math.random() * 0.8;
 
         // Only increment rainbow if no stamps were removed (not replacing)
         if (removedCount === 0) {
@@ -352,8 +359,8 @@ class ColoringPageMaker {
       const stamp = placedStamp.stamp;
       const imgCanvas = stamp.processedImage!;
 
-      // Calculate size: scale to 1/3 of original size for higher DPI
-      const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3);
+      // Calculate size: scale to 1/3 of original size for higher DPI, then apply random multiplier
+      const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3) * placedStamp.sizeMultiplier;
       const width = imgCanvas.width * scale;
       const height = imgCanvas.height * scale;
 
@@ -419,9 +426,11 @@ class ColoringPageMaker {
         placedStamp.stamp,
         placedStamp.x,
         placedStamp.y,
+        placedStamp.sizeMultiplier,
         newStamp,
         x,
-        y
+        y,
+        this.currentSizeMultiplier
       );
 
       // Keep the stamp if overlap is less than or equal to 10%
@@ -435,18 +444,20 @@ class ColoringPageMaker {
     stamp1: Stamp,
     x1: number,
     y1: number,
+    sizeMultiplier1: number,
     stamp2: Stamp,
     x2: number,
-    y2: number
+    y2: number,
+    sizeMultiplier2: number
   ): number {
-    // Calculate rendered dimensions (1/3 scale)
+    // Calculate rendered dimensions (1/3 scale with size multiplier)
     const img1 = stamp1.processedImage!;
-    const scale1 = (stamp1.size / Math.max(img1.width, img1.height)) * (1/3);
+    const scale1 = (stamp1.size / Math.max(img1.width, img1.height)) * (1/3) * sizeMultiplier1;
     const width1 = img1.width * scale1;
     const height1 = img1.height * scale1;
 
     const img2 = stamp2.processedImage!;
-    const scale2 = (stamp2.size / Math.max(img2.width, img2.height)) * (1/3);
+    const scale2 = (stamp2.size / Math.max(img2.width, img2.height)) * (1/3) * sizeMultiplier2;
     const width2 = img2.width * scale2;
     const height2 = img2.height * scale2;
 
@@ -866,7 +877,7 @@ class ColoringPageMaker {
 
     // Draw all placed stamps
     this.placedStamps.forEach((placedStamp) => {
-      this.drawStamp(placedStamp.stamp, placedStamp.x, placedStamp.y, 1.0);
+      this.drawStamp(placedStamp.stamp, placedStamp.x, placedStamp.y, 1.0, placedStamp.sizeMultiplier);
     });
 
     // Draw preview (faint outline)
@@ -875,12 +886,13 @@ class ColoringPageMaker {
         this.selectedStamp,
         this.previewPosition.x,
         this.previewPosition.y,
-        0.3
+        0.3,
+        this.currentSizeMultiplier
       );
     }
   }
 
-  private drawStamp(stamp: Stamp, x: number, y: number, opacity: number): void {
+  private drawStamp(stamp: Stamp, x: number, y: number, opacity: number, sizeMultiplier: number = 1.0): void {
     this.ctx.save();
     this.ctx.globalAlpha = opacity;
 
@@ -891,8 +903,8 @@ class ColoringPageMaker {
     // Use the cached processed image (background already removed)
     const imgCanvas = stamp.processedImage!;
 
-    // Calculate size: scale to 1/3 of original size for higher DPI on canvas
-    const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3);
+    // Calculate size: scale to 1/3 of original size for higher DPI on canvas, then apply random multiplier
+    const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3) * sizeMultiplier;
     const width = imgCanvas.width * scale;
     const height = imgCanvas.height * scale;
 
