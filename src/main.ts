@@ -20,6 +20,9 @@ class ColoringPageMaker {
   private placedStamps: PlacedStamp[] = [];
   private previewPosition: { x: number; y: number } | null = null;
   private audioContext: AudioContext;
+  private rainbowProgress: number = 0; // 0 to 100
+  private starburstParticles: Array<{ x: number; y: number; vx: number; vy: number; life: number }> = [];
+  private isAnimating: boolean = false;
 
   constructor() {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -109,6 +112,15 @@ class ColoringPageMaker {
 
         // Play a silly sound
         this.playSillySound();
+
+        // Increment rainbow progress by 10%
+        const wasComplete = this.rainbowProgress >= 100;
+        this.rainbowProgress = Math.min(100, this.rainbowProgress + 10);
+
+        // Trigger celebration when reaching 100%
+        if (!wasComplete && this.rainbowProgress >= 100) {
+          this.triggerCelebration();
+        }
 
         this.render();
       }
@@ -247,9 +259,149 @@ class ColoringPageMaker {
     }
   }
 
+  private playCelebrationSound(): void {
+    const now = this.audioContext.currentTime;
+
+    // Play a triumphant ascending arpeggio
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C, E, G, C, E
+
+    notes.forEach((frequency, index) => {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+
+      const offset = index * 0.1;
+
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(frequency, now + offset);
+
+      gainNode.gain.setValueAtTime(0.3, now + offset);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + offset + 0.4);
+
+      oscillator.start(now + offset);
+      oscillator.stop(now + offset + 0.4);
+    });
+  }
+
+  private triggerCelebration(): void {
+    // Play celebration sound
+    this.playCelebrationSound();
+
+    // Create starburst particles
+    const centerX = this.canvas.width / 2;
+    const centerY = 150;
+    const numParticles = 50;
+
+    for (let i = 0; i < numParticles; i++) {
+      const angle = (Math.PI * 2 * i) / numParticles;
+      const speed = 3 + Math.random() * 2;
+      this.starburstParticles.push({
+        x: centerX,
+        y: centerY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: 1.0,
+      });
+    }
+
+    this.isAnimating = true;
+    this.animateStarburst();
+  }
+
+  private animateStarburst(): void {
+    if (!this.isAnimating) return;
+
+    // Update particle positions and life
+    this.starburstParticles.forEach((particle) => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.life -= 0.02;
+    });
+
+    // Remove dead particles
+    this.starburstParticles = this.starburstParticles.filter((p) => p.life > 0);
+
+    // Stop animating when all particles are gone
+    if (this.starburstParticles.length === 0) {
+      this.isAnimating = false;
+      return;
+    }
+
+    this.render();
+    requestAnimationFrame(() => this.animateStarburst());
+  }
+
+  private drawStarburst(): void {
+    this.starburstParticles.forEach((particle) => {
+      this.ctx.save();
+      this.ctx.globalAlpha = particle.life;
+      this.ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+      this.ctx.beginPath();
+      this.ctx.arc(particle.x, particle.y, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    });
+  }
+
+  private drawRainbow(): void {
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height + 200; // Position below canvas for upward arc
+    const startRadius = 550;
+    const arcWidth = 30;
+    const numStripes = 7;
+
+    // Rainbow colors
+    const rainbowColors = [
+      { r: 255, g: 0, b: 0 },     // Red
+      { r: 255, g: 127, b: 0 },   // Orange
+      { r: 255, g: 255, b: 0 },   // Yellow
+      { r: 0, g: 255, b: 0 },     // Green
+      { r: 0, g: 0, b: 255 },     // Blue
+      { r: 75, g: 0, b: 130 },    // Indigo
+      { r: 148, g: 0, b: 211 },   // Violet
+    ];
+
+    // Draw each stripe of the rainbow
+    for (let i = numStripes - 1; i >= 0; i--) {
+      const radius = startRadius + i * arcWidth;
+      const color = rainbowColors[i];
+
+      // First, draw the outline for the entire stripe
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, radius, Math.PI, 0, true);
+      this.ctx.strokeStyle = '#cccccc';
+      this.ctx.lineWidth = arcWidth;
+      this.ctx.stroke();
+
+      // Then, draw the colored portion based on progress
+      if (this.rainbowProgress > 0) {
+        // Calculate the angle range for the filled portion
+        const progressFraction = this.rainbowProgress / 100;
+        const startAngle = Math.PI;
+        const endAngle = Math.PI + (Math.PI * progressFraction);
+
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, radius, startAngle, endAngle, true);
+        this.ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+        this.ctx.lineWidth = arcWidth;
+        this.ctx.stroke();
+      }
+    }
+  }
+
   private render(): void {
     // Clear canvas
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+    // Draw rainbow at the top
+    this.drawRainbow();
+
+    // Draw starburst particles if animating
+    if (this.isAnimating) {
+      this.drawStarburst();
+    }
 
     // Draw all placed stamps
     this.placedStamps.forEach((placedStamp) => {
