@@ -292,11 +292,11 @@ class ColoringPageMaker {
     // Create starburst particles
     const centerX = this.canvas.width / 2;
     const centerY = 150;
-    const numParticles = 50;
+    const numParticles = 80;
 
     for (let i = 0; i < numParticles; i++) {
       const angle = (Math.PI * 2 * i) / numParticles;
-      const speed = 3 + Math.random() * 2;
+      const speed = 8 + Math.random() * 4; // Much faster particles
       this.starburstParticles.push({
         x: centerX,
         y: centerY,
@@ -339,7 +339,7 @@ class ColoringPageMaker {
       this.ctx.globalAlpha = particle.life;
       this.ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
       this.ctx.beginPath();
-      this.ctx.arc(particle.x, particle.y, 4, 0, Math.PI * 2);
+      this.ctx.arc(particle.x, particle.y, 8, 0, Math.PI * 2); // Larger particles
       this.ctx.fill();
       this.ctx.restore();
     });
@@ -347,44 +347,45 @@ class ColoringPageMaker {
 
   private drawRainbow(): void {
     const centerX = this.canvas.width / 2;
-    const centerY = this.canvas.height + 200; // Position below canvas for upward arc
-    const startRadius = 550;
+    const centerY = 390; // Position center below the visible arc
+    const startRadius = 340; // Innermost radius (violet)
     const arcWidth = 30;
     const numStripes = 7;
 
-    // Rainbow colors
+    // Rainbow colors (from outer to inner: red to violet)
     const rainbowColors = [
-      { r: 255, g: 0, b: 0 },     // Red
+      { r: 255, g: 0, b: 0 },     // Red (outermost)
       { r: 255, g: 127, b: 0 },   // Orange
       { r: 255, g: 255, b: 0 },   // Yellow
       { r: 0, g: 255, b: 0 },     // Green
       { r: 0, g: 0, b: 255 },     // Blue
       { r: 75, g: 0, b: 130 },    // Indigo
-      { r: 148, g: 0, b: 211 },   // Violet
+      { r: 148, g: 0, b: 211 },   // Violet (innermost)
     ];
 
-    // Draw each stripe of the rainbow
-    for (let i = numStripes - 1; i >= 0; i--) {
-      const radius = startRadius + i * arcWidth;
+    // Draw each stripe of the rainbow (from outer to inner)
+    for (let i = 0; i < numStripes; i++) {
+      const radius = startRadius + (numStripes - 1 - i) * arcWidth;
       const color = rainbowColors[i];
 
-      // First, draw the outline for the entire stripe
-      this.ctx.beginPath();
-      this.ctx.arc(centerX, centerY, radius, Math.PI, 0, true);
-      this.ctx.strokeStyle = '#cccccc';
-      this.ctx.lineWidth = arcWidth;
-      this.ctx.stroke();
+      const progressFraction = this.rainbowProgress / 100;
 
-      // Then, draw the colored portion based on progress
-      if (this.rainbowProgress > 0) {
-        // Calculate the angle range for the filled portion
-        const progressFraction = this.rainbowProgress / 100;
-        const startAngle = Math.PI;
-        const endAngle = Math.PI + (Math.PI * progressFraction);
-
+      // Draw the colored portion from left (0) to progress point
+      if (progressFraction > 0) {
+        const filledEndAngle = progressFraction * Math.PI;
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, radius, startAngle, endAngle, true);
+        this.ctx.arc(centerX, centerY, radius, 0, filledEndAngle, false);
         this.ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+        this.ctx.lineWidth = arcWidth;
+        this.ctx.stroke();
+      }
+
+      // Draw the unfilled portion (gray outline) from progress point to right (π)
+      if (progressFraction < 1) {
+        const unfilledStartAngle = progressFraction * Math.PI;
+        this.ctx.beginPath();
+        this.ctx.arc(centerX, centerY, radius, unfilledStartAngle, Math.PI, false);
+        this.ctx.strokeStyle = '#cccccc';
         this.ctx.lineWidth = arcWidth;
         this.ctx.stroke();
       }
