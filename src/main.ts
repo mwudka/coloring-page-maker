@@ -267,7 +267,7 @@ class ColoringPageMaker {
     this.canvas.addEventListener('click', () => {
       if (this.selectedStamp && this.previewPosition) {
         // Remove any overlapping stamps before placing new one
-        this.removeOverlappingStamps(
+        const removedCount = this.removeOverlappingStamps(
           this.previewPosition.x,
           this.previewPosition.y,
           this.selectedStamp.size
@@ -282,20 +282,23 @@ class ColoringPageMaker {
         // Play a silly sound
         this.playSillySound();
 
-        // Increment rainbow target progress by 10%
-        const wasComplete = this.rainbowTargetProgress >= 100;
-        this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
+        // Only increment rainbow if no stamps were removed (not replacing)
+        if (removedCount === 0) {
+          // Increment rainbow target progress by 10%
+          const wasComplete = this.rainbowTargetProgress >= 100;
+          this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
 
-        // Start animating if not already
-        if (!this.isRainbowAnimating) {
-          this.isRainbowAnimating = true;
-          this.animateRainbowProgress();
-        }
+          // Start animating if not already
+          if (!this.isRainbowAnimating) {
+            this.isRainbowAnimating = true;
+            this.animateRainbowProgress();
+          }
 
-        // Trigger celebration when reaching 100%
-        if (!wasComplete && this.rainbowTargetProgress >= 100) {
-          // Delay celebration until animation completes
-          this.scheduleCelebration();
+          // Trigger celebration when reaching 100%
+          if (!wasComplete && this.rainbowTargetProgress >= 100) {
+            // Delay celebration until animation completes
+            this.scheduleCelebration();
+          }
         }
 
         this.render();
@@ -404,18 +407,27 @@ class ColoringPageMaker {
     window.open(pdfUrl, '_blank');
   }
 
-  private removeOverlappingStamps(x: number, y: number, size: number): void {
+  private removeOverlappingStamps(x: number, y: number, size: number): number {
     // Check for overlaps and remove them
-    // Two stamps overlap if their centers are closer than the average of their sizes
+    // Two stamps overlap if their centers are closer than the average of their rendered sizes
+    // Remember: stamps are rendered at 1/3 scale on canvas
+    const beforeCount = this.placedStamps.length;
+
     this.placedStamps = this.placedStamps.filter((placedStamp) => {
       const dx = placedStamp.x - x;
       const dy = placedStamp.y - y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      const overlapThreshold = (placedStamp.stamp.size + size) / 2;
+
+      // Apply 1/3 scaling to match actual rendered size on canvas
+      const placedStampRenderedSize = placedStamp.stamp.size * (1/3);
+      const newStampRenderedSize = size * (1/3);
+      const overlapThreshold = (placedStampRenderedSize + newStampRenderedSize) / 2;
 
       // Keep the stamp if it's NOT overlapping (distance >= threshold)
       return distance >= overlapThreshold;
     });
+
+    return beforeCount - this.placedStamps.length;
   }
 
   private animateRainbowProgress(): void {
