@@ -258,20 +258,29 @@ class ColoringPageMaker {
   }
 
   private setupCanvasEvents(): void {
-    this.canvas.addEventListener('mousemove', (e) => {
+    // Track mouse movement globally when stamp is selected
+    const handleMouseMove = (e: MouseEvent) => {
       if (this.selectedStamp) {
         const rect = this.canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Clamp coordinates to canvas bounds
         this.previewPosition = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
+          x: Math.max(0, Math.min(this.canvas.width, x)),
+          y: Math.max(0, Math.min(this.canvas.height, y)),
         };
         this.render();
       }
-    });
+    };
 
-    this.canvas.addEventListener('mouseleave', () => {
-      this.previewPosition = null;
-      this.render();
+    // Use document-level mouse move to track cursor even outside canvas
+    document.addEventListener('mousemove', handleMouseMove);
+
+    this.canvas.addEventListener('mouseenter', () => {
+      if (this.selectedStamp) {
+        this.canvas.setPointerCapture(1);
+      }
     });
 
     this.canvas.addEventListener('click', () => {
