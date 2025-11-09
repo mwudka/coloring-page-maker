@@ -146,7 +146,7 @@ class ColoringPageMaker {
   }
 
   private generatePDF(): void {
-    // Create a temporary canvas to render only the stamps (no rainbow, no starburst)
+    // Create a temporary canvas to render the rainbow and stamps (no starburst)
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = this.canvas.width;
     tempCanvas.height = this.canvas.height;
@@ -156,7 +156,10 @@ class ColoringPageMaker {
     tempCtx.fillStyle = '#ffffff';
     tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
 
-    // Draw only the placed stamps
+    // Draw the rainbow
+    this.drawRainbowOnContext(tempCtx);
+
+    // Draw the placed stamps
     this.placedStamps.forEach((placedStamp) => {
       tempCtx.save();
       tempCtx.font = `${placedStamp.stamp.size}px Arial`;
@@ -465,7 +468,7 @@ class ColoringPageMaker {
     });
   }
 
-  private drawRainbow(): void {
+  private drawRainbowOnContext(ctx: CanvasRenderingContext2D): void {
     const centerX = this.canvas.width / 2;
     const centerY = 450; // Position center below the canvas
     const startRadius = 340; // Innermost radius (violet)
@@ -491,29 +494,33 @@ class ColoringPageMaker {
       const progressFraction = this.rainbowProgress / 100;
 
       // Draw white background for the entire band
-      this.ctx.beginPath();
-      this.ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI, false);
-      this.ctx.strokeStyle = '#ffffff';
-      this.ctx.lineWidth = arcWidth - 2;
-      this.ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI, false);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = arcWidth - 2;
+      ctx.stroke();
 
       // Draw border lines to separate the bands
-      this.ctx.beginPath();
-      this.ctx.arc(centerX, centerY, radius - arcWidth / 2, Math.PI, 2 * Math.PI, false);
-      this.ctx.strokeStyle = '#999999';
-      this.ctx.lineWidth = 1;
-      this.ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius - arcWidth / 2, Math.PI, 2 * Math.PI, false);
+      ctx.strokeStyle = '#999999';
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
       // Draw the filled colored portion from left (π) to progress point
       if (progressFraction > 0) {
         const filledEndAngle = Math.PI + progressFraction * Math.PI;
-        this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, radius, Math.PI, filledEndAngle, false);
-        this.ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        this.ctx.lineWidth = arcWidth;
-        this.ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius, Math.PI, filledEndAngle, false);
+        ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+        ctx.lineWidth = arcWidth;
+        ctx.stroke();
       }
     }
+  }
+
+  private drawRainbow(): void {
+    this.drawRainbowOnContext(this.ctx);
   }
 
   private render(): void {
