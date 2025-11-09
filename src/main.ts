@@ -255,31 +255,69 @@ class ColoringPageMaker {
         el.classList.remove('selected');
       }
     });
+
+    // Request pointer lock on canvas to confine cursor
+    this.canvas.requestPointerLock();
+  }
+
+  private deselectStamp(): void {
+    this.selectedStamp = null;
+    this.previewPosition = null;
+
+    // Clear all selected stamps in UI
+    const stampElements = document.querySelectorAll('.stamp-item');
+    stampElements.forEach((el) => {
+      el.classList.remove('selected');
+    });
+
+    // Release pointer lock
+    document.exitPointerLock();
+    this.render();
   }
 
   private setupCanvasEvents(): void {
-    // Track mouse movement globally when stamp is selected
+    // Track mouse movement with pointer lock
     const handleMouseMove = (e: MouseEvent) => {
       if (this.selectedStamp) {
-        const rect = this.canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        if (document.pointerLockElement === this.canvas) {
+          // Pointer is locked - use movement deltas
+          if (!this.previewPosition) {
+            // Initialize at center of canvas
+            this.previewPosition = {
+              x: this.canvas.width / 2,
+              y: this.canvas.height / 2,
+            };
+          }
 
-        // Clamp coordinates to canvas bounds
-        this.previewPosition = {
-          x: Math.max(0, Math.min(this.canvas.width, x)),
-          y: Math.max(0, Math.min(this.canvas.height, y)),
-        };
+          // Update position based on movement
+          const newX = this.previewPosition.x + e.movementX;
+          const newY = this.previewPosition.y + e.movementY;
+
+          // Clamp to canvas bounds
+          this.previewPosition = {
+            x: Math.max(0, Math.min(this.canvas.width, newX)),
+            y: Math.max(0, Math.min(this.canvas.height, newY)),
+          };
+        } else {
+          // Pointer not locked yet - use regular coordinates
+          const rect = this.canvas.getBoundingClientRect();
+          this.previewPosition = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          };
+        }
         this.render();
       }
     };
 
-    // Use document-level mouse move to track cursor even outside canvas
+    // Use document-level mouse move to track cursor
     document.addEventListener('mousemove', handleMouseMove);
 
-    this.canvas.addEventListener('mouseenter', () => {
-      if (this.selectedStamp) {
-        this.canvas.setPointerCapture(1);
+    // Handle pointer lock changes (e.g., user exits via browser UI)
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement !== this.canvas && this.selectedStamp) {
+        // Pointer lock was released but stamp is still selected - deselect it
+        this.deselectStamp();
       }
     });
 
@@ -338,6 +376,13 @@ class ColoringPageMaker {
 
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (e) => {
+      // Escape key to deselect stamp
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.deselectStamp();
+        return;
+      }
+
       // Check for Ctrl+Alt+Shift+[A-M] hotkeys
       if (e.ctrlKey && e.altKey && e.shiftKey) {
         const key = e.key.toUpperCase();
