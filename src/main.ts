@@ -269,8 +269,7 @@ class ColoringPageMaker {
         // Remove any overlapping stamps before placing new one
         const removedCount = this.removeOverlappingStamps(
           this.previewPosition.x,
-          this.previewPosition.y,
-          this.selectedStamp.size
+          this.previewPosition.y
         );
 
         this.placedStamps.push({
@@ -407,27 +406,156 @@ class ColoringPageMaker {
     window.open(pdfUrl, '_blank');
   }
 
-  private removeOverlappingStamps(x: number, y: number, size: number): number {
-    // Check for overlaps and remove them
-    // Two stamps overlap if their centers are closer than the average of their rendered sizes
-    // Remember: stamps are rendered at 1/3 scale on canvas
+  private removeOverlappingStamps(x: number, y: number): number {
+    // Pixel-perfect collision detection with 10% overlap tolerance
     const beforeCount = this.placedStamps.length;
 
+    // Get the new stamp we're about to place
+    const newStamp = this.selectedStamp!;
+
     this.placedStamps = this.placedStamps.filter((placedStamp) => {
-      const dx = placedStamp.x - x;
-      const dy = placedStamp.y - y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      // Calculate overlap percentage using pixel-perfect detection
+      const overlapPercent = this.calculateStampOverlap(
+        placedStamp.stamp,
+        placedStamp.x,
+        placedStamp.y,
+        newStamp,
+        x,
+        y
+      );
 
-      // Apply 1/3 scaling to match actual rendered size on canvas
-      const placedStampRenderedSize = placedStamp.stamp.size * (1/3);
-      const newStampRenderedSize = size * (1/3);
-      const overlapThreshold = (placedStampRenderedSize + newStampRenderedSize) / 2;
-
-      // Keep the stamp if it's NOT overlapping (distance >= threshold)
-      return distance >= overlapThreshold;
+      // Keep the stamp if overlap is less than or equal to 10%
+      return overlapPercent <= 10;
     });
 
     return beforeCount - this.placedStamps.length;
+  }
+
+  private calculateStampOverlap(
+    stamp1: Stamp,
+    x1: number,
+    y1: number,
+    stamp2: Stamp,
+    x2: number,
+    y2: number
+  ): number {
+    // Calculate rendered dimensions (1/3 scale)
+    const img1 = stamp1.processedImage!;
+    const scale1 = (stamp1.size / Math.max(img1.width, img1.height)) * (1/3);
+    const width1 = img1.width * scale1;
+    const height1 = img1.height * scale1;
+
+    const img2 = stamp2.processedImage!;
+    const scale2 = (stamp2.size / Math.max(img2.width, img2.height)) * (1/3);
+    const width2 = img2.width * scale2;
+    const height2 = img2.height * scale2;
+
+    // Calculate bounding boxes (centered at x, y)
+    const box1 = {
+      left: x1 - width1 / 2,
+      top: y1 - height1 / 2,
+      right: x1 + width1 / 2,
+      bottom: y1 + height1 / 2,
+      width: width1,
+      height: height1,
+    };
+
+    const box2 = {
+      left: x2 - width2 / 2,
+      top: y2 - height2 / 2,
+      right: x2 + width2 / 2,
+      bottom: y2 + height2 / 2,
+      width: width2,
+      height: height2,
+    };
+
+    // Quick bounding box check - if boxes don't intersect, no overlap
+    if (
+      box1.right < box2.left ||
+      box1.left > box2.right ||
+      box1.bottom < box2.top ||
+      box1.top > box2.bottom
+    ) {
+      return 0;
+    }
+
+    // Calculate intersection rectangle
+    const intersectLeft = Math.max(box1.left, box2.left);
+    const intersectTop = Math.max(box1.top, box2.top);
+    const intersectRight = Math.min(box1.right, box2.right);
+    const intersectBottom = Math.min(box1.bottom, box2.bottom);
+    const intersectWidth = intersectRight - intersectLeft;
+    const intersectHeight = intersectBottom - intersectTop;
+
+    // Create temporary canvases to render stamps at their actual positions
+    const tempCanvas1 = document.createElement('canvas');
+    tempCanvas1.width = Math.ceil(width1);
+    tempCanvas1.height = Math.ceil(height1);
+    const tempCtx1 = tempCanvas1.getContext('2d')!;
+    tempCtx1.drawImage(img1, 0, 0, width1, height1);
+    const imgData1 = tempCtx1.getImageData(0, 0, tempCanvas1.width, tempCanvas1.height);
+
+    const tempCanvas2 = document.createElement('canvas');
+    tempCanvas2.width = Math.ceil(width2);
+    tempCanvas2.height = Math.ceil(height2);
+    const tempCtx2 = tempCanvas2.getContext('2d')!;
+    tempCtx2.drawImage(img2, 0, 0, width2, height2);
+    const imgData2 = tempCtx2.getImageData(0, 0, tempCanvas2.width, tempCanvas2.height);
+
+    // Count overlapping non-transparent pixels
+    let overlapPixels = 0;
+    let totalPixels1 = 0;
+    let totalPixels2 = 0;
+
+    // Count total non-transparent pixels in each stamp
+    for (let i = 3; i < imgData1.data.length; i += 4) {
+      if (imgData1.data[i] > 0) totalPixels1++;
+    }
+    for (let i = 3; i < imgData2.data.length; i += 4) {
+      if (imgData2.data[i] > 0) totalPixels2++;
+    }
+
+    // Check pixels in intersection area
+    for (let y = 0; y < intersectHeight; y++) {
+      for (let x = 0; x < intersectWidth; x++) {
+        // Calculate absolute position
+        const absX = intersectLeft + x;
+        const absY = intersectTop + y;
+
+        // Calculate position in stamp1's local coordinates
+        const local1X = Math.floor(absX - box1.left);
+        const local1Y = Math.floor(absY - box1.top);
+
+        // Calculate position in stamp2's local coordinates
+        const local2X = Math.floor(absX - box2.left);
+        const local2Y = Math.floor(absY - box2.top);
+
+        // Check if both positions are within bounds
+        if (
+          local1X >= 0 && local1X < tempCanvas1.width &&
+          local1Y >= 0 && local1Y < tempCanvas1.height &&
+          local2X >= 0 && local2X < tempCanvas2.width &&
+          local2Y >= 0 && local2Y < tempCanvas2.height
+        ) {
+          // Get alpha values
+          const idx1 = (local1Y * tempCanvas1.width + local1X) * 4 + 3;
+          const idx2 = (local2Y * tempCanvas2.width + local2X) * 4 + 3;
+          const alpha1 = imgData1.data[idx1];
+          const alpha2 = imgData2.data[idx2];
+
+          // Both pixels are non-transparent - this is an overlap
+          if (alpha1 > 0 && alpha2 > 0) {
+            overlapPixels++;
+          }
+        }
+      }
+    }
+
+    // Calculate overlap as percentage of the smaller stamp
+    const smallerStampPixels = Math.min(totalPixels1, totalPixels2);
+    if (smallerStampPixels === 0) return 0;
+
+    return (overlapPixels / smallerStampPixels) * 100;
   }
 
   private animateRainbowProgress(): void {
