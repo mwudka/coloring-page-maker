@@ -20,7 +20,8 @@ class ColoringPageMaker {
   private placedStamps: PlacedStamp[] = [];
   private previewPosition: { x: number; y: number } | null = null;
   private audioContext: AudioContext;
-  private rainbowProgress: number = 0; // 0 to 100
+  private rainbowProgress: number = 0; // 0 to 100 (current animated value)
+  private rainbowTargetProgress: number = 0; // 0 to 100 (target value)
   private starburstParticles: Array<{ x: number; y: number; vx: number; vy: number; life: number }> = [];
   private isAnimating: boolean = false;
 
@@ -113,13 +114,20 @@ class ColoringPageMaker {
         // Play a silly sound
         this.playSillySound();
 
-        // Increment rainbow progress by 10%
-        const wasComplete = this.rainbowProgress >= 100;
-        this.rainbowProgress = Math.min(100, this.rainbowProgress + 10);
+        // Increment rainbow target progress by 10%
+        const wasComplete = this.rainbowTargetProgress >= 100;
+        this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
+
+        // Start animating if not already
+        if (!this.isAnimating) {
+          this.isAnimating = true;
+          this.animateRainbowProgress();
+        }
 
         // Trigger celebration when reaching 100%
-        if (!wasComplete && this.rainbowProgress >= 100) {
-          this.triggerCelebration();
+        if (!wasComplete && this.rainbowTargetProgress >= 100) {
+          // Delay celebration until animation completes
+          this.scheduleCelebration();
         }
 
         this.render();
@@ -139,6 +147,41 @@ class ColoringPageMaker {
       // Keep the stamp if it's NOT overlapping (distance >= threshold)
       return distance >= overlapThreshold;
     });
+  }
+
+  private animateRainbowProgress(): void {
+    if (!this.isAnimating) return;
+
+    // Smoothly animate progress toward target (3% per frame at 60fps ≈ 0.5 seconds for 10%)
+    const animationSpeed = 3;
+    const diff = this.rainbowTargetProgress - this.rainbowProgress;
+
+    if (Math.abs(diff) < 0.1) {
+      // Close enough, snap to target
+      this.rainbowProgress = this.rainbowTargetProgress;
+      this.isAnimating = false;
+    } else {
+      // Move toward target
+      this.rainbowProgress += Math.sign(diff) * Math.min(animationSpeed, Math.abs(diff));
+    }
+
+    this.render();
+
+    if (this.isAnimating) {
+      requestAnimationFrame(() => this.animateRainbowProgress());
+    }
+  }
+
+  private scheduleCelebration(): void {
+    // Wait for animation to complete, then trigger celebration
+    const checkComplete = () => {
+      if (this.rainbowProgress >= 100) {
+        this.triggerCelebration();
+      } else {
+        requestAnimationFrame(checkComplete);
+      }
+    };
+    requestAnimationFrame(checkComplete);
   }
 
   private playSillySound(): void {
