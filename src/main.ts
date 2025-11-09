@@ -1,4 +1,5 @@
 import './style.css';
+import { jsPDF } from 'jspdf';
 
 interface Stamp {
   id: string;
@@ -23,7 +24,8 @@ class ColoringPageMaker {
   private rainbowProgress: number = 0; // 0 to 100 (current animated value)
   private rainbowTargetProgress: number = 0; // 0 to 100 (target value)
   private starburstParticles: Array<{ x: number; y: number; vx: number; vy: number; life: number }> = [];
-  private isAnimating: boolean = false;
+  private isRainbowAnimating: boolean = false;
+  private isStarburstAnimating: boolean = false;
 
   constructor() {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -50,6 +52,7 @@ class ColoringPageMaker {
 
     this.initializeStampList();
     this.setupCanvasEvents();
+    this.setupPrintButton();
     this.render();
   }
 
@@ -119,8 +122,8 @@ class ColoringPageMaker {
         this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
 
         // Start animating if not already
-        if (!this.isAnimating) {
-          this.isAnimating = true;
+        if (!this.isRainbowAnimating) {
+          this.isRainbowAnimating = true;
           this.animateRainbowProgress();
         }
 
@@ -133,6 +136,80 @@ class ColoringPageMaker {
         this.render();
       }
     });
+  }
+
+  private setupPrintButton(): void {
+    const printButton = document.getElementById('printButton');
+    if (printButton) {
+      printButton.addEventListener('click', () => this.generatePDF());
+    }
+  }
+
+  private generatePDF(): void {
+    // Create a temporary canvas to render only the stamps (no rainbow, no starburst)
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = this.canvas.width;
+    tempCanvas.height = this.canvas.height;
+    const tempCtx = tempCanvas.getContext('2d')!;
+
+    // Fill with white background
+    tempCtx.fillStyle = '#ffffff';
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // Draw only the placed stamps
+    this.placedStamps.forEach((placedStamp) => {
+      tempCtx.save();
+      tempCtx.font = `${placedStamp.stamp.size}px Arial`;
+      tempCtx.textAlign = 'center';
+      tempCtx.textBaseline = 'middle';
+      tempCtx.fillStyle = '#000000';
+      tempCtx.fillText(placedStamp.stamp.emoji, placedStamp.x, placedStamp.y);
+      tempCtx.restore();
+    });
+
+    // Convert canvas to image
+    const imgData = tempCanvas.toDataURL('image/png');
+
+    // Create PDF with 8.5x11 inch dimensions
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'in',
+      format: 'letter',
+    });
+
+    // Calculate dimensions to fit the canvas (680x880) into the PDF page
+    const pageWidth = 8.5;
+    const pageHeight = 11;
+    const margin = 0.5;
+    const availableWidth = pageWidth - 2 * margin;
+    const availableHeight = pageHeight - 2 * margin;
+
+    // Canvas aspect ratio
+    const canvasAspectRatio = this.canvas.width / this.canvas.height;
+    const availableAspectRatio = availableWidth / availableHeight;
+
+    let imgWidth, imgHeight, xOffset, yOffset;
+
+    if (canvasAspectRatio > availableAspectRatio) {
+      // Canvas is wider relative to available space
+      imgWidth = availableWidth;
+      imgHeight = availableWidth / canvasAspectRatio;
+      xOffset = margin;
+      yOffset = (pageHeight - imgHeight) / 2;
+    } else {
+      // Canvas is taller relative to available space
+      imgHeight = availableHeight;
+      imgWidth = availableHeight * canvasAspectRatio;
+      xOffset = (pageWidth - imgWidth) / 2;
+      yOffset = margin;
+    }
+
+    pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, imgHeight);
+
+    // Open PDF in new tab
+    const pdfBlob = pdf.output('blob');
+    const pdfUrl = URL.createObjectURL(pdfBlob);
+    window.open(pdfUrl, '_blank');
   }
 
   private removeOverlappingStamps(x: number, y: number, size: number): void {
@@ -150,7 +227,7 @@ class ColoringPageMaker {
   }
 
   private animateRainbowProgress(): void {
-    if (!this.isAnimating) return;
+    if (!this.isRainbowAnimating) return;
 
     // Smoothly animate progress toward target (3% per frame at 60fps ≈ 0.5 seconds for 10%)
     const animationSpeed = 3;
@@ -159,7 +236,7 @@ class ColoringPageMaker {
     if (Math.abs(diff) < 0.1) {
       // Close enough, snap to target
       this.rainbowProgress = this.rainbowTargetProgress;
-      this.isAnimating = false;
+      this.isRainbowAnimating = false;
     } else {
       // Move toward target
       this.rainbowProgress += Math.sign(diff) * Math.min(animationSpeed, Math.abs(diff));
@@ -167,7 +244,7 @@ class ColoringPageMaker {
 
     this.render();
 
-    if (this.isAnimating) {
+    if (this.isRainbowAnimating) {
       requestAnimationFrame(() => this.animateRainbowProgress());
     }
   }
@@ -349,18 +426,18 @@ class ColoringPageMaker {
       });
     }
 
-    this.isAnimating = true;
+    this.isStarburstAnimating = true;
     this.animateStarburst();
   }
 
   private animateStarburst(): void {
-    if (!this.isAnimating) return;
+    if (!this.isStarburstAnimating) return;
 
     // Update particle positions and life
     this.starburstParticles.forEach((particle) => {
       particle.x += particle.vx;
       particle.y += particle.vy;
-      particle.life -= 0.02;
+      particle.life -= 0.004; // Much slower decay for longer visibility
     });
 
     // Remove dead particles
@@ -368,7 +445,7 @@ class ColoringPageMaker {
 
     // Stop animating when all particles are gone
     if (this.starburstParticles.length === 0) {
-      this.isAnimating = false;
+      this.isStarburstAnimating = false;
       return;
     }
 
@@ -447,7 +524,7 @@ class ColoringPageMaker {
     this.drawRainbow();
 
     // Draw starburst particles if animating
-    if (this.isAnimating) {
+    if (this.isStarburstAnimating) {
       this.drawStarburst();
     }
 
