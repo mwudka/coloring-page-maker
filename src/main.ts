@@ -36,18 +36,20 @@ class ColoringPageMaker {
     this.canvas.width = 680;
     this.canvas.height = 880;
 
-    // Define available stamps (using emoji for simplicity)
+    // Define available stamps - magical/fantasy theme for coloring pages
     this.stamps = [
-      { id: 'star', emoji: '⭐', size: 60 },
+      { id: 'unicorn1', emoji: '🦄', size: 60 },
+      { id: 'unicorn2', emoji: '🐴', size: 60 },
       { id: 'heart', emoji: '❤️', size: 60 },
       { id: 'flower', emoji: '🌸', size: 60 },
-      { id: 'sun', emoji: '☀️', size: 60 },
+      { id: 'sunflower', emoji: '🌻', size: 60 },
+      { id: 'rose', emoji: '🌺', size: 60 },
+      { id: 'star', emoji: '⭐', size: 60 },
       { id: 'moon', emoji: '🌙', size: 60 },
-      { id: 'tree', emoji: '🌲', size: 60 },
       { id: 'butterfly', emoji: '🦋', size: 60 },
-      { id: 'cat', emoji: '🐱', size: 60 },
-      { id: 'dog', emoji: '🐶', size: 60 },
       { id: 'rainbow', emoji: '🌈', size: 60 },
+      { id: 'sparkles', emoji: '✨', size: 60 },
+      { id: 'crown', emoji: '👑', size: 60 },
     ];
 
     this.initializeStampList();
