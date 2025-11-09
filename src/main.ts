@@ -292,11 +292,11 @@ class ColoringPageMaker {
     // Create starburst particles
     const centerX = this.canvas.width / 2;
     const centerY = 150;
-    const numParticles = 80;
+    const numParticles = 150;
 
     for (let i = 0; i < numParticles; i++) {
       const angle = (Math.PI * 2 * i) / numParticles;
-      const speed = 8 + Math.random() * 4; // Much faster particles
+      const speed = 12 + Math.random() * 8; // Even faster particles (12-20)
       this.starburstParticles.push({
         x: centerX,
         y: centerY,
@@ -347,7 +347,7 @@ class ColoringPageMaker {
 
   private drawRainbow(): void {
     const centerX = this.canvas.width / 2;
-    const centerY = 390; // Position center below the visible arc
+    const centerY = 450; // Position center below the canvas
     const startRadius = 340; // Innermost radius (violet)
     const arcWidth = 30;
     const numStripes = 7;
@@ -370,22 +370,26 @@ class ColoringPageMaker {
 
       const progressFraction = this.rainbowProgress / 100;
 
-      // Draw the colored portion from left (0) to progress point
-      if (progressFraction > 0) {
-        const filledEndAngle = progressFraction * Math.PI;
-        this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, radius, 0, filledEndAngle, false);
-        this.ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-        this.ctx.lineWidth = arcWidth;
-        this.ctx.stroke();
-      }
+      // First, draw the outline for the entire band in its color (very thin to show structure)
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI, false);
+      this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
+      this.ctx.lineWidth = arcWidth - 2;
+      this.ctx.stroke();
 
-      // Draw the unfilled portion (gray outline) from progress point to right (π)
-      if (progressFraction < 1) {
-        const unfilledStartAngle = progressFraction * Math.PI;
+      // Draw border lines to separate the bands
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY, radius - arcWidth / 2, Math.PI, 2 * Math.PI, false);
+      this.ctx.strokeStyle = '#999999';
+      this.ctx.lineWidth = 1;
+      this.ctx.stroke();
+
+      // Draw the filled colored portion from left (π) to progress point
+      if (progressFraction > 0) {
+        const filledEndAngle = Math.PI + progressFraction * Math.PI;
         this.ctx.beginPath();
-        this.ctx.arc(centerX, centerY, radius, unfilledStartAngle, Math.PI, false);
-        this.ctx.strokeStyle = '#cccccc';
+        this.ctx.arc(centerX, centerY, radius, Math.PI, filledEndAngle, false);
+        this.ctx.strokeStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
         this.ctx.lineWidth = arcWidth;
         this.ctx.stroke();
       }
