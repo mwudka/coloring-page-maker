@@ -79,7 +79,7 @@ class ColoringPageMaker {
         img.onload = () => resolve(img);
         img.onerror = reject;
       });
-      img.src = `/stamps/${stampFile.filename}`;
+      img.src = `${import.meta.env.BASE_URL}stamps/${stampFile.filename}`;
 
       await loadPromise;
 
