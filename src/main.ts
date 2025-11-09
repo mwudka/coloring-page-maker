@@ -423,13 +423,19 @@ class ColoringPageMaker {
 
   private removeOverlappingStamps(x: number, y: number): number {
     // Pixel-perfect collision detection with 10% overlap tolerance
+    // Only remove stamps of the SAME type (allow different stamps to overlap)
     const beforeCount = this.placedStamps.length;
 
     // Get the new stamp we're about to place
     const newStamp = this.selectedStamp!;
 
     this.placedStamps = this.placedStamps.filter((placedStamp) => {
-      // Calculate overlap percentage using pixel-perfect detection
+      // Allow different stamp types to overlap
+      if (placedStamp.stamp.id !== newStamp.id) {
+        return true; // Keep stamps of different types
+      }
+
+      // For same stamp type, check overlap percentage using pixel-perfect detection
       const overlapPercent = this.calculateStampOverlap(
         placedStamp.stamp,
         placedStamp.x,
