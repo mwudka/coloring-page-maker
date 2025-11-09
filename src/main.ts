@@ -1,13 +1,13 @@
 import './style.css';
 import { jsPDF } from 'jspdf';
 
-type DrawFunction = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => void;
-
 interface Stamp {
   id: string;
   name: string;
   size: number;
-  draw: DrawFunction;
+  image: HTMLImageElement;
+  thumbnail: HTMLCanvasElement | null;
+  processedImage: HTMLCanvasElement | null; // Cached background-removed image
 }
 
 interface PlacedStamp {
@@ -34,31 +34,186 @@ class ColoringPageMaker {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
     this.audioContext = new AudioContext();
+    this.stamps = [];
 
     // Set canvas size to 8.5x11 aspect ratio
     this.canvas.width = 680;
     this.canvas.height = 880;
 
-    // Define available stamps - magical/fantasy theme with outline drawings
-    this.stamps = [
-      { id: 'unicorn1', name: 'Unicorn', size: 50, draw: this.drawUnicorn },
-      { id: 'unicorn2', name: 'Horse', size: 50, draw: this.drawHorse },
-      { id: 'heart', name: 'Heart', size: 40, draw: this.drawHeart },
-      { id: 'flower', name: 'Flower', size: 45, draw: this.drawFlower },
-      { id: 'sunflower', name: 'Sunflower', size: 45, draw: this.drawSunflower },
-      { id: 'rose', name: 'Rose', size: 45, draw: this.drawRose },
-      { id: 'star', name: 'Star', size: 40, draw: this.drawStar },
-      { id: 'moon', name: 'Moon', size: 40, draw: this.drawMoon },
-      { id: 'butterfly', name: 'Butterfly', size: 45, draw: this.drawButterfly },
-      { id: 'rainbow', name: 'Rainbow', size: 50, draw: this.drawRainbowStamp },
-      { id: 'sparkles', name: 'Sparkles', size: 40, draw: this.drawSparkles },
-      { id: 'crown', name: 'Crown', size: 40, draw: this.drawCrown },
-    ];
-
-    this.initializeStampList();
     this.setupCanvasEvents();
     this.setupPrintButton();
+    this.setupKeyboardShortcuts();
+    this.initialize();
+  }
+
+  private async initialize(): Promise<void> {
+    await this.loadStamps();
+    this.initializeStampList();
     this.render();
+  }
+
+  private async loadStamps(): Promise<void> {
+    // Define 13 stamp images to load
+    const stampFiles = [
+      { id: 'stamp1', name: 'Stamp 1', filename: '1.png' },
+      { id: 'stamp2', name: 'Stamp 2', filename: '2.png' },
+      { id: 'stamp3', name: 'Stamp 3', filename: '3.png' },
+      { id: 'stamp4', name: 'Stamp 4', filename: '4.png' },
+      { id: 'stamp5', name: 'Stamp 5', filename: '5.png' },
+      { id: 'stamp6', name: 'Stamp 6', filename: '6.png' },
+      { id: 'stamp7', name: 'Stamp 7', filename: '7.png' },
+      { id: 'stamp8', name: 'Stamp 8', filename: '8.png' },
+      { id: 'stamp9', name: 'Stamp 9', filename: '9.png' },
+      { id: 'stamp10', name: 'Stamp 10', filename: '10.png' },
+      { id: 'stamp11', name: 'Stamp 11', filename: '11.png' },
+      { id: 'stamp12', name: 'Stamp 12', filename: '12.png' },
+      { id: 'stamp13', name: 'Stamp 13', filename: '13.png' },
+    ];
+
+    // Load all images
+    const imagePromises = stampFiles.map(async (stampFile) => {
+      const img = new Image();
+      const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+      });
+      img.src = `/stamps/${stampFile.filename}`;
+
+      await loadPromise;
+
+      // Trim 50px from all sides to remove borders/margins
+      const trimmedImage = this.trimImage(img, 50);
+
+      // Process image (remove background)
+      const processedImage = this.removeBackground(trimmedImage);
+
+      // Generate thumbnail from processed image
+      const thumbnail = this.generateThumbnail(processedImage);
+
+      // Use the maximum dimension of the processed image as the size
+      const size = Math.max(processedImage.width, processedImage.height);
+
+      return {
+        id: stampFile.id,
+        name: stampFile.name,
+        size: size,
+        image: img,
+        thumbnail,
+        processedImage,
+      };
+    });
+
+    this.stamps = await Promise.all(imagePromises);
+  }
+
+  private trimImage(img: HTMLImageElement, trim: number): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    const trimmedWidth = Math.max(1, img.width - trim * 2);
+    const trimmedHeight = Math.max(1, img.height - trim * 2);
+
+    canvas.width = trimmedWidth;
+    canvas.height = trimmedHeight;
+    const ctx = canvas.getContext('2d')!;
+
+    // Draw the trimmed portion of the image
+    ctx.drawImage(
+      img,
+      trim, trim, trimmedWidth, trimmedHeight,  // Source rectangle
+      0, 0, trimmedWidth, trimmedHeight          // Destination rectangle
+    );
+
+    return canvas;
+  }
+
+  private generateThumbnail(processedImage: HTMLCanvasElement): HTMLCanvasElement {
+    const thumbnailSize = 80; // Match the CSS stamp-item size
+    const canvas = document.createElement('canvas');
+    canvas.width = thumbnailSize;
+    canvas.height = thumbnailSize;
+    const ctx = canvas.getContext('2d')!;
+
+    // Enable high-quality image smoothing
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Calculate scaling to fit image in thumbnail
+    const scale = Math.min(
+      thumbnailSize / processedImage.width,
+      thumbnailSize / processedImage.height
+    );
+    const scaledWidth = processedImage.width * scale;
+    const scaledHeight = processedImage.height * scale;
+    const x = (thumbnailSize - scaledWidth) / 2;
+    const y = (thumbnailSize - scaledHeight) / 2;
+
+    // Draw image centered in thumbnail
+    ctx.drawImage(processedImage, x, y, scaledWidth, scaledHeight);
+
+    return canvas;
+  }
+
+  private removeBackground(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = sourceCanvas.width;
+    canvas.height = sourceCanvas.height;
+    const ctx = canvas.getContext('2d')!;
+
+    // Enable high-quality rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // Draw the source canvas
+    ctx.drawImage(sourceCanvas, 0, 0);
+
+    // Get image data
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+
+    // Sample background color from corners (in case of compression artifacts)
+    const corners = [
+      0, // top-left
+      (canvas.width - 1) * 4, // top-right
+      (canvas.height - 1) * canvas.width * 4, // bottom-left
+      ((canvas.height - 1) * canvas.width + (canvas.width - 1)) * 4, // bottom-right
+    ];
+
+    // Calculate average background color from corners
+    let bgR = 0, bgG = 0, bgB = 0;
+    for (const corner of corners) {
+      bgR += data[corner];
+      bgG += data[corner + 1];
+      bgB += data[corner + 2];
+    }
+    bgR = Math.round(bgR / corners.length);
+    bgG = Math.round(bgG / corners.length);
+    bgB = Math.round(bgB / corners.length);
+
+    // Increased tolerance for better background removal (especially with JPEGs)
+    const tolerance = 85;
+
+    // Make all pixels that match the background color transparent
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      // Calculate color distance (Euclidean distance in RGB space)
+      const distance = Math.sqrt(
+        Math.pow(r - bgR, 2) +
+        Math.pow(g - bgG, 2) +
+        Math.pow(b - bgB, 2)
+      );
+
+      // Make transparent if close to background color
+      if (distance <= tolerance) {
+        data[i + 3] = 0; // Set alpha to 0 (transparent)
+      }
+    }
+
+    // Put the modified image data back
+    ctx.putImageData(imageData, 0, 0);
+
+    return canvas;
   }
 
   private initializeStampList(): void {
@@ -68,16 +223,11 @@ class ColoringPageMaker {
       const stampElement = document.createElement('div');
       stampElement.className = 'stamp-item';
 
-      // Create a small canvas to preview the stamp
-      const previewCanvas = document.createElement('canvas');
-      previewCanvas.width = 60;
-      previewCanvas.height = 60;
-      const previewCtx = previewCanvas.getContext('2d')!;
+      // Use the pre-generated thumbnail
+      if (stamp.thumbnail) {
+        stampElement.appendChild(stamp.thumbnail);
+      }
 
-      // Draw the stamp preview
-      stamp.draw(previewCtx, 30, 30, 25);
-
-      stampElement.appendChild(previewCanvas);
       stampElement.addEventListener('click', () => this.selectStamp(stamp));
       stampList.appendChild(stampElement);
     });
@@ -160,6 +310,23 @@ class ColoringPageMaker {
     }
   }
 
+  private setupKeyboardShortcuts(): void {
+    document.addEventListener('keydown', (e) => {
+      // Check for Ctrl+Alt+Shift+[A-M] hotkeys
+      if (e.ctrlKey && e.altKey && e.shiftKey) {
+        const key = e.key.toUpperCase();
+        const hotkeys = 'ABCDEFGHIJKLM';
+        const index = hotkeys.indexOf(key);
+
+        if (index >= 0 && index < this.stamps.length) {
+          e.preventDefault();
+          this.selectStamp(this.stamps[index]);
+          console.log(`Hotkey activated: Ctrl+Alt+Shift+${key} -> Stamp ${index + 1}`);
+        }
+      }
+    });
+  }
+
   private generatePDF(): void {
     // Create a temporary canvas to render the rainbow and stamps (no starburst)
     const tempCanvas = document.createElement('canvas');
@@ -174,9 +341,22 @@ class ColoringPageMaker {
     // Draw the rainbow
     this.drawRainbowOnContext(tempCtx);
 
+    // Enable high-quality rendering for PDF
+    tempCtx.imageSmoothingEnabled = true;
+    tempCtx.imageSmoothingQuality = 'high';
+
     // Draw the placed stamps
     this.placedStamps.forEach((placedStamp) => {
-      placedStamp.stamp.draw(tempCtx, placedStamp.x, placedStamp.y, placedStamp.stamp.size);
+      const stamp = placedStamp.stamp;
+      const imgCanvas = stamp.processedImage!;
+
+      // Calculate size based on stamp.size (max dimension)
+      const scale = stamp.size / Math.max(imgCanvas.width, imgCanvas.height);
+      const width = imgCanvas.width * scale;
+      const height = imgCanvas.height * scale;
+
+      // Draw centered at x, y
+      tempCtx.drawImage(imgCanvas, placedStamp.x - width / 2, placedStamp.y - height / 2, width, height);
     });
 
     // Convert canvas to image
@@ -563,323 +743,22 @@ class ColoringPageMaker {
   private drawStamp(stamp: Stamp, x: number, y: number, opacity: number): void {
     this.ctx.save();
     this.ctx.globalAlpha = opacity;
-    stamp.draw(this.ctx, x, y, stamp.size);
+
+    // Enable high-quality image smoothing
+    this.ctx.imageSmoothingEnabled = true;
+    this.ctx.imageSmoothingQuality = 'high';
+
+    // Use the cached processed image (background already removed)
+    const imgCanvas = stamp.processedImage!;
+
+    // Calculate size based on stamp.size (max dimension)
+    const scale = stamp.size / Math.max(imgCanvas.width, imgCanvas.height);
+    const width = imgCanvas.width * scale;
+    const height = imgCanvas.height * scale;
+
+    // Draw centered at x, y
+    this.ctx.drawImage(imgCanvas, x - width / 2, y - height / 2, width, height);
     this.ctx.restore();
-  }
-
-  // Stamp drawing functions - all create outline drawings for coloring
-  private drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    ctx.beginPath();
-    ctx.moveTo(x, y + size * 0.3);
-    ctx.bezierCurveTo(x, y, x - size * 0.5, y, x - size * 0.5, y + size * 0.3);
-    ctx.bezierCurveTo(x - size * 0.5, y + size * 0.5, x, y + size * 0.7, x, y + size);
-    ctx.bezierCurveTo(x, y + size * 0.7, x + size * 0.5, y + size * 0.5, x + size * 0.5, y + size * 0.3);
-    ctx.bezierCurveTo(x + size * 0.5, y, x, y, x, y + size * 0.3);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    const spikes = 5;
-    const outerRadius = size * 0.5;
-    const innerRadius = size * 0.2;
-
-    ctx.beginPath();
-    for (let i = 0; i < spikes * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
-      const angle = (i * Math.PI) / spikes - Math.PI / 2;
-      const px = x + Math.cos(angle) * radius;
-      const py = y + Math.sin(angle) * radius;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawFlower(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    const petalCount = 5;
-    const petalSize = size * 0.25;
-
-    // Draw petals
-    for (let i = 0; i < petalCount; i++) {
-      const angle = (i * 2 * Math.PI) / petalCount;
-      const px = x + Math.cos(angle) * size * 0.3;
-      const py = y + Math.sin(angle) * size * 0.3;
-
-      ctx.beginPath();
-      ctx.ellipse(px, py, petalSize, petalSize * 0.6, angle, 0, Math.PI * 2);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-
-    // Draw center
-    ctx.beginPath();
-    ctx.arc(x, y, size * 0.15, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawSunflower(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    const petalCount = 12;
-
-    // Draw petals
-    for (let i = 0; i < petalCount; i++) {
-      const angle = (i * 2 * Math.PI) / petalCount;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(angle);
-
-      ctx.beginPath();
-      ctx.moveTo(size * 0.2, 0);
-      ctx.lineTo(size * 0.5, -size * 0.1);
-      ctx.lineTo(size * 0.5, size * 0.1);
-      ctx.closePath();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    // Draw center with seeds pattern
-    ctx.beginPath();
-    ctx.arc(x, y, size * 0.2, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Small dots in center
-    for (let i = 0; i < 8; i++) {
-      const angle = (i * Math.PI) / 4;
-      const dotX = x + Math.cos(angle) * size * 0.1;
-      const dotY = y + Math.sin(angle) * size * 0.1;
-      ctx.beginPath();
-      ctx.arc(dotX, dotY, 1, 0, Math.PI * 2);
-      ctx.fillStyle = '#000000';
-      ctx.fill();
-    }
-  }
-
-  private drawRose(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    // Outer petals (spiral)
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const angle = (i * 2 * Math.PI) / 3;
-      const radius = size * 0.4;
-      const px = x + Math.cos(angle) * radius * 0.5;
-      const py = y + Math.sin(angle) * radius * 0.5;
-
-      ctx.moveTo(px, py);
-      ctx.bezierCurveTo(
-        px + Math.cos(angle - 0.5) * radius,
-        py + Math.sin(angle - 0.5) * radius,
-        px + Math.cos(angle + 0.5) * radius,
-        py + Math.sin(angle + 0.5) * radius,
-        px, py
-      );
-    }
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Center spiral
-    ctx.beginPath();
-    ctx.arc(x, y, size * 0.15, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawMoon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    ctx.beginPath();
-    ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
-    ctx.arc(x + size * 0.2, y, size * 0.4, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawButterfly(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    // Body
-    ctx.beginPath();
-    ctx.moveTo(x, y - size * 0.4);
-    ctx.lineTo(x, y + size * 0.4);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Antennae
-    ctx.beginPath();
-    ctx.moveTo(x, y - size * 0.4);
-    ctx.lineTo(x - size * 0.1, y - size * 0.5);
-    ctx.moveTo(x, y - size * 0.4);
-    ctx.lineTo(x + size * 0.1, y - size * 0.5);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    // Left wings
-    ctx.beginPath();
-    ctx.ellipse(x - size * 0.25, y - size * 0.15, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
-    ctx.ellipse(x - size * 0.25, y + size * 0.15, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Right wings
-    ctx.beginPath();
-    ctx.ellipse(x + size * 0.25, y - size * 0.15, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
-    ctx.ellipse(x + size * 0.25, y + size * 0.15, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawRainbowStamp(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    const stripes = 3;
-    const arcWidth = size * 0.12;
-
-    for (let i = 0; i < stripes; i++) {
-      const radius = size * 0.15 + i * arcWidth;
-      ctx.beginPath();
-      ctx.arc(x, y + size * 0.3, radius, Math.PI, 0, true);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-  }
-
-  private drawSparkles(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    const drawSparkle = (cx: number, cy: number, s: number) => {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - s);
-      ctx.lineTo(cx, cy + s);
-      ctx.moveTo(cx - s, cy);
-      ctx.lineTo(cx + s, cy);
-      ctx.moveTo(cx - s * 0.7, cy - s * 0.7);
-      ctx.lineTo(cx + s * 0.7, cy + s * 0.7);
-      ctx.moveTo(cx - s * 0.7, cy + s * 0.7);
-      ctx.lineTo(cx + s * 0.7, cy - s * 0.7);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    };
-
-    drawSparkle(x, y, size * 0.3);
-    drawSparkle(x - size * 0.3, y + size * 0.2, size * 0.15);
-    drawSparkle(x + size * 0.3, y + size * 0.2, size * 0.15);
-    drawSparkle(x, y - size * 0.3, size * 0.2);
-  }
-
-  private drawCrown(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    ctx.beginPath();
-    ctx.moveTo(x - size * 0.4, y + size * 0.3);
-    ctx.lineTo(x - size * 0.3, y - size * 0.3);
-    ctx.lineTo(x - size * 0.15, y);
-    ctx.lineTo(x, y - size * 0.4);
-    ctx.lineTo(x + size * 0.15, y);
-    ctx.lineTo(x + size * 0.3, y - size * 0.3);
-    ctx.lineTo(x + size * 0.4, y + size * 0.3);
-    ctx.closePath();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Jewels
-    for (let i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.arc(x + i * size * 0.15, y - size * 0.15, size * 0.06, 0, Math.PI * 2);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  }
-
-  private drawUnicorn(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    // Head (circle)
-    ctx.beginPath();
-    ctx.arc(x, y, size * 0.35, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Horn
-    ctx.beginPath();
-    ctx.moveTo(x - size * 0.1, y - size * 0.35);
-    ctx.lineTo(x, y - size * 0.6);
-    ctx.lineTo(x + size * 0.1, y - size * 0.35);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Ear
-    ctx.beginPath();
-    ctx.moveTo(x + size * 0.2, y - size * 0.3);
-    ctx.lineTo(x + size * 0.3, y - size * 0.45);
-    ctx.lineTo(x + size * 0.25, y - size * 0.25);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Eye
-    ctx.beginPath();
-    ctx.arc(x + size * 0.12, y - size * 0.05, size * 0.05, 0, Math.PI * 2);
-    ctx.fillStyle = '#000000';
-    ctx.fill();
-
-    // Mane
-    ctx.beginPath();
-    ctx.moveTo(x - size * 0.25, y - size * 0.25);
-    ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.15, x - size * 0.3, y);
-    ctx.quadraticCurveTo(x - size * 0.4, y + size * 0.15, x - size * 0.25, y + size * 0.25);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  private drawHorse(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
-    // Head (different angle)
-    ctx.beginPath();
-    ctx.ellipse(x, y, size * 0.3, size * 0.35, Math.PI / 6, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Snout
-    ctx.beginPath();
-    ctx.ellipse(x + size * 0.25, y + size * 0.2, size * 0.15, size * 0.12, Math.PI / 6, 0, Math.PI * 2);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Ears
-    ctx.beginPath();
-    ctx.moveTo(x - size * 0.15, y - size * 0.35);
-    ctx.lineTo(x - size * 0.1, y - size * 0.5);
-    ctx.lineTo(x - size * 0.05, y - size * 0.35);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Eye
-    ctx.beginPath();
-    ctx.arc(x + size * 0.05, y - size * 0.1, size * 0.05, 0, Math.PI * 2);
-    ctx.fillStyle = '#000000';
-    ctx.fill();
-
-    // Mane
-    ctx.beginPath();
-    ctx.moveTo(x - size * 0.2, y - size * 0.3);
-    ctx.quadraticCurveTo(x - size * 0.5, y - size * 0.2, x - size * 0.4, y + size * 0.1);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
-    ctx.stroke();
   }
 }
 
