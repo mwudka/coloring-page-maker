@@ -1,10 +1,13 @@
 import './style.css';
 import { jsPDF } from 'jspdf';
 
+type DrawFunction = (ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => void;
+
 interface Stamp {
   id: string;
-  emoji: string;
+  name: string;
   size: number;
+  draw: DrawFunction;
 }
 
 interface PlacedStamp {
@@ -36,20 +39,20 @@ class ColoringPageMaker {
     this.canvas.width = 680;
     this.canvas.height = 880;
 
-    // Define available stamps - magical/fantasy theme for coloring pages
+    // Define available stamps - magical/fantasy theme with outline drawings
     this.stamps = [
-      { id: 'unicorn1', emoji: '🦄', size: 60 },
-      { id: 'unicorn2', emoji: '🐴', size: 60 },
-      { id: 'heart', emoji: '❤️', size: 60 },
-      { id: 'flower', emoji: '🌸', size: 60 },
-      { id: 'sunflower', emoji: '🌻', size: 60 },
-      { id: 'rose', emoji: '🌺', size: 60 },
-      { id: 'star', emoji: '⭐', size: 60 },
-      { id: 'moon', emoji: '🌙', size: 60 },
-      { id: 'butterfly', emoji: '🦋', size: 60 },
-      { id: 'rainbow', emoji: '🌈', size: 60 },
-      { id: 'sparkles', emoji: '✨', size: 60 },
-      { id: 'crown', emoji: '👑', size: 60 },
+      { id: 'unicorn1', name: 'Unicorn', size: 50, draw: this.drawUnicorn },
+      { id: 'unicorn2', name: 'Horse', size: 50, draw: this.drawHorse },
+      { id: 'heart', name: 'Heart', size: 40, draw: this.drawHeart },
+      { id: 'flower', name: 'Flower', size: 45, draw: this.drawFlower },
+      { id: 'sunflower', name: 'Sunflower', size: 45, draw: this.drawSunflower },
+      { id: 'rose', name: 'Rose', size: 45, draw: this.drawRose },
+      { id: 'star', name: 'Star', size: 40, draw: this.drawStar },
+      { id: 'moon', name: 'Moon', size: 40, draw: this.drawMoon },
+      { id: 'butterfly', name: 'Butterfly', size: 45, draw: this.drawButterfly },
+      { id: 'rainbow', name: 'Rainbow', size: 50, draw: this.drawRainbowStamp },
+      { id: 'sparkles', name: 'Sparkles', size: 40, draw: this.drawSparkles },
+      { id: 'crown', name: 'Crown', size: 40, draw: this.drawCrown },
     ];
 
     this.initializeStampList();
@@ -64,7 +67,17 @@ class ColoringPageMaker {
     this.stamps.forEach((stamp) => {
       const stampElement = document.createElement('div');
       stampElement.className = 'stamp-item';
-      stampElement.textContent = stamp.emoji;
+
+      // Create a small canvas to preview the stamp
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = 60;
+      previewCanvas.height = 60;
+      const previewCtx = previewCanvas.getContext('2d')!;
+
+      // Draw the stamp preview
+      stamp.draw(previewCtx, 30, 30, 25);
+
+      stampElement.appendChild(previewCanvas);
       stampElement.addEventListener('click', () => this.selectStamp(stamp));
       stampList.appendChild(stampElement);
     });
@@ -163,13 +176,7 @@ class ColoringPageMaker {
 
     // Draw the placed stamps
     this.placedStamps.forEach((placedStamp) => {
-      tempCtx.save();
-      tempCtx.font = `${placedStamp.stamp.size}px Arial`;
-      tempCtx.textAlign = 'center';
-      tempCtx.textBaseline = 'middle';
-      tempCtx.fillStyle = '#000000';
-      tempCtx.fillText(placedStamp.stamp.emoji, placedStamp.x, placedStamp.y);
-      tempCtx.restore();
+      placedStamp.stamp.draw(tempCtx, placedStamp.x, placedStamp.y, placedStamp.stamp.size);
     });
 
     // Convert canvas to image
@@ -556,11 +563,323 @@ class ColoringPageMaker {
   private drawStamp(stamp: Stamp, x: number, y: number, opacity: number): void {
     this.ctx.save();
     this.ctx.globalAlpha = opacity;
-    this.ctx.font = `${stamp.size}px Arial`;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(stamp.emoji, x, y);
+    stamp.draw(this.ctx, x, y, stamp.size);
     this.ctx.restore();
+  }
+
+  // Stamp drawing functions - all create outline drawings for coloring
+  private drawHeart(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x, y + size * 0.3);
+    ctx.bezierCurveTo(x, y, x - size * 0.5, y, x - size * 0.5, y + size * 0.3);
+    ctx.bezierCurveTo(x - size * 0.5, y + size * 0.5, x, y + size * 0.7, x, y + size);
+    ctx.bezierCurveTo(x, y + size * 0.7, x + size * 0.5, y + size * 0.5, x + size * 0.5, y + size * 0.3);
+    ctx.bezierCurveTo(x + size * 0.5, y, x, y, x, y + size * 0.3);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawStar(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    const spikes = 5;
+    const outerRadius = size * 0.5;
+    const innerRadius = size * 0.2;
+
+    ctx.beginPath();
+    for (let i = 0; i < spikes * 2; i++) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = (i * Math.PI) / spikes - Math.PI / 2;
+      const px = x + Math.cos(angle) * radius;
+      const py = y + Math.sin(angle) * radius;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawFlower(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    const petalCount = 5;
+    const petalSize = size * 0.25;
+
+    // Draw petals
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i * 2 * Math.PI) / petalCount;
+      const px = x + Math.cos(angle) * size * 0.3;
+      const py = y + Math.sin(angle) * size * 0.3;
+
+      ctx.beginPath();
+      ctx.ellipse(px, py, petalSize, petalSize * 0.6, angle, 0, Math.PI * 2);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Draw center
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.15, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawSunflower(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    const petalCount = 12;
+
+    // Draw petals
+    for (let i = 0; i < petalCount; i++) {
+      const angle = (i * 2 * Math.PI) / petalCount;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(size * 0.2, 0);
+      ctx.lineTo(size * 0.5, -size * 0.1);
+      ctx.lineTo(size * 0.5, size * 0.1);
+      ctx.closePath();
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Draw center with seeds pattern
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.2, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Small dots in center
+    for (let i = 0; i < 8; i++) {
+      const angle = (i * Math.PI) / 4;
+      const dotX = x + Math.cos(angle) * size * 0.1;
+      const dotY = y + Math.sin(angle) * size * 0.1;
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, 1, 0, Math.PI * 2);
+      ctx.fillStyle = '#000000';
+      ctx.fill();
+    }
+  }
+
+  private drawRose(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    // Outer petals (spiral)
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const angle = (i * 2 * Math.PI) / 3;
+      const radius = size * 0.4;
+      const px = x + Math.cos(angle) * radius * 0.5;
+      const py = y + Math.sin(angle) * radius * 0.5;
+
+      ctx.moveTo(px, py);
+      ctx.bezierCurveTo(
+        px + Math.cos(angle - 0.5) * radius,
+        py + Math.sin(angle - 0.5) * radius,
+        px + Math.cos(angle + 0.5) * radius,
+        py + Math.sin(angle + 0.5) * radius,
+        px, py
+      );
+    }
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Center spiral
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.15, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawMoon(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+    ctx.arc(x + size * 0.2, y, size * 0.4, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawButterfly(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(x, y - size * 0.4);
+    ctx.lineTo(x, y + size * 0.4);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // Antennae
+    ctx.beginPath();
+    ctx.moveTo(x, y - size * 0.4);
+    ctx.lineTo(x - size * 0.1, y - size * 0.5);
+    ctx.moveTo(x, y - size * 0.4);
+    ctx.lineTo(x + size * 0.1, y - size * 0.5);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Left wings
+    ctx.beginPath();
+    ctx.ellipse(x - size * 0.25, y - size * 0.15, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.ellipse(x - size * 0.25, y + size * 0.15, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Right wings
+    ctx.beginPath();
+    ctx.ellipse(x + size * 0.25, y - size * 0.15, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
+    ctx.ellipse(x + size * 0.25, y + size * 0.15, size * 0.25, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawRainbowStamp(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    const stripes = 3;
+    const arcWidth = size * 0.12;
+
+    for (let i = 0; i < stripes; i++) {
+      const radius = size * 0.15 + i * arcWidth;
+      ctx.beginPath();
+      ctx.arc(x, y + size * 0.3, radius, Math.PI, 0, true);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  private drawSparkles(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    const drawSparkle = (cx: number, cy: number, s: number) => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - s);
+      ctx.lineTo(cx, cy + s);
+      ctx.moveTo(cx - s, cy);
+      ctx.lineTo(cx + s, cy);
+      ctx.moveTo(cx - s * 0.7, cy - s * 0.7);
+      ctx.lineTo(cx + s * 0.7, cy + s * 0.7);
+      ctx.moveTo(cx - s * 0.7, cy + s * 0.7);
+      ctx.lineTo(cx + s * 0.7, cy - s * 0.7);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    };
+
+    drawSparkle(x, y, size * 0.3);
+    drawSparkle(x - size * 0.3, y + size * 0.2, size * 0.15);
+    drawSparkle(x + size * 0.3, y + size * 0.2, size * 0.15);
+    drawSparkle(x, y - size * 0.3, size * 0.2);
+  }
+
+  private drawCrown(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.4, y + size * 0.3);
+    ctx.lineTo(x - size * 0.3, y - size * 0.3);
+    ctx.lineTo(x - size * 0.15, y);
+    ctx.lineTo(x, y - size * 0.4);
+    ctx.lineTo(x + size * 0.15, y);
+    ctx.lineTo(x + size * 0.3, y - size * 0.3);
+    ctx.lineTo(x + size * 0.4, y + size * 0.3);
+    ctx.closePath();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Jewels
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.arc(x + i * size * 0.15, y - size * 0.15, size * 0.06, 0, Math.PI * 2);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  private drawUnicorn(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    // Head (circle)
+    ctx.beginPath();
+    ctx.arc(x, y, size * 0.35, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Horn
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.1, y - size * 0.35);
+    ctx.lineTo(x, y - size * 0.6);
+    ctx.lineTo(x + size * 0.1, y - size * 0.35);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Ear
+    ctx.beginPath();
+    ctx.moveTo(x + size * 0.2, y - size * 0.3);
+    ctx.lineTo(x + size * 0.3, y - size * 0.45);
+    ctx.lineTo(x + size * 0.25, y - size * 0.25);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Eye
+    ctx.beginPath();
+    ctx.arc(x + size * 0.12, y - size * 0.05, size * 0.05, 0, Math.PI * 2);
+    ctx.fillStyle = '#000000';
+    ctx.fill();
+
+    // Mane
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.25, y - size * 0.25);
+    ctx.quadraticCurveTo(x - size * 0.4, y - size * 0.15, x - size * 0.3, y);
+    ctx.quadraticCurveTo(x - size * 0.4, y + size * 0.15, x - size * 0.25, y + size * 0.25);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  private drawHorse(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+    // Head (different angle)
+    ctx.beginPath();
+    ctx.ellipse(x, y, size * 0.3, size * 0.35, Math.PI / 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Snout
+    ctx.beginPath();
+    ctx.ellipse(x + size * 0.25, y + size * 0.2, size * 0.15, size * 0.12, Math.PI / 6, 0, Math.PI * 2);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Ears
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.15, y - size * 0.35);
+    ctx.lineTo(x - size * 0.1, y - size * 0.5);
+    ctx.lineTo(x - size * 0.05, y - size * 0.35);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Eye
+    ctx.beginPath();
+    ctx.arc(x + size * 0.05, y - size * 0.1, size * 0.05, 0, Math.PI * 2);
+    ctx.fillStyle = '#000000';
+    ctx.fill();
+
+    // Mane
+    ctx.beginPath();
+    ctx.moveTo(x - size * 0.2, y - size * 0.3);
+    ctx.quadraticCurveTo(x - size * 0.5, y - size * 0.2, x - size * 0.4, y + size * 0.1);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 }
 
