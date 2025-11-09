@@ -370,10 +370,10 @@ class ColoringPageMaker {
 
       const progressFraction = this.rainbowProgress / 100;
 
-      // First, draw the outline for the entire band in its color (very thin to show structure)
+      // Draw gray outline for the entire band
       this.ctx.beginPath();
       this.ctx.arc(centerX, centerY, radius, Math.PI, 2 * Math.PI, false);
-      this.ctx.strokeStyle = `rgba(${color.r}, ${color.g}, ${color.b}, 0.3)`;
+      this.ctx.strokeStyle = '#cccccc';
       this.ctx.lineWidth = arcWidth - 2;
       this.ctx.stroke();
 
