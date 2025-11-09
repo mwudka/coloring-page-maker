@@ -350,8 +350,8 @@ class ColoringPageMaker {
       const stamp = placedStamp.stamp;
       const imgCanvas = stamp.processedImage!;
 
-      // Calculate size based on stamp.size (max dimension)
-      const scale = stamp.size / Math.max(imgCanvas.width, imgCanvas.height);
+      // Calculate size: scale to 1/3 of original size for higher DPI
+      const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3);
       const width = imgCanvas.width * scale;
       const height = imgCanvas.height * scale;
 
@@ -751,8 +751,8 @@ class ColoringPageMaker {
     // Use the cached processed image (background already removed)
     const imgCanvas = stamp.processedImage!;
 
-    // Calculate size based on stamp.size (max dimension)
-    const scale = stamp.size / Math.max(imgCanvas.width, imgCanvas.height);
+    // Calculate size: scale to 1/3 of original size for higher DPI on canvas
+    const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3);
     const width = imgCanvas.width * scale;
     const height = imgCanvas.height * scale;
 

@@ -4,7 +4,13 @@
       "Bash(npx tsc:*)",
       "Bash(git commit:*)",
       "Bash(npm run build:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(mkdir:*)",
+      "Bash(\"X:\\projects\\coloring-page-maker\\src\\main.ts.tmp\")",
+      "Bash(cat:*)",
+      "Bash(python -m json.tool:*)",
+      "Bash(python generate_ulanzi_profile.py:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
