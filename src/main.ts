@@ -24,9 +24,9 @@ class ColoringPageMaker {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
 
-    // Set canvas size
-    this.canvas.width = 800;
-    this.canvas.height = 600;
+    // Set canvas size to 8.5x11 aspect ratio
+    this.canvas.width = 680;
+    this.canvas.height = 880;
 
     // Define available stamps (using emoji for simplicity)
     this.stamps = [
@@ -92,6 +92,13 @@ class ColoringPageMaker {
 
     this.canvas.addEventListener('click', (e) => {
       if (this.selectedStamp && this.previewPosition) {
+        // Remove any overlapping stamps before placing new one
+        this.removeOverlappingStamps(
+          this.previewPosition.x,
+          this.previewPosition.y,
+          this.selectedStamp.size
+        );
+
         this.placedStamps.push({
           stamp: this.selectedStamp,
           x: this.previewPosition.x,
@@ -99,6 +106,20 @@ class ColoringPageMaker {
         });
         this.render();
       }
+    });
+  }
+
+  private removeOverlappingStamps(x: number, y: number, size: number): void {
+    // Check for overlaps and remove them
+    // Two stamps overlap if their centers are closer than the average of their sizes
+    this.placedStamps = this.placedStamps.filter((placedStamp) => {
+      const dx = placedStamp.x - x;
+      const dy = placedStamp.y - y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const overlapThreshold = (placedStamp.stamp.size + size) / 2;
+
+      // Keep the stamp if it's NOT overlapping (distance >= threshold)
+      return distance >= overlapThreshold;
     });
   }
 
