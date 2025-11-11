@@ -232,7 +232,8 @@ def main():
     if len(sys.argv) > 1:
         output_file = Path(sys.argv[1])
     else:
-        output_file = script_dir / "Coloring Page Maker.ulanziDeckProfile"
+        # Output to public directory so it gets included in the build
+        output_file = script_dir / "public" / "Coloring Page Maker.ulanziDeckProfile"
 
     # Validate stamps directory
     if not stamps_dir.exists():

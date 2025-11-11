@@ -8,6 +8,7 @@ interface Stamp {
   image: HTMLImageElement;
   thumbnail: HTMLCanvasElement | null;
   processedImage: HTMLCanvasElement | null; // Cached background-removed image
+  isRemoveTool?: boolean; // Flag to indicate this is the remove tool
 }
 
 interface PlacedStamp {
@@ -103,13 +104,17 @@ class ColoringPageMaker {
       // Use the maximum dimension of the processed image as the size
       const size = Math.max(processedImage.width, processedImage.height);
 
+      // Mark stamp 13 as the remove tool
+      const isRemoveTool = stampMeta.filename === '13.png';
+
       stamps.push({
         id: stampMeta.id,
-        name: stampMeta.filename.replace('.png', ''),
+        name: isRemoveTool ? 'Remove' : stampMeta.filename.replace('.png', ''),
         size: size,
         image: img,
         thumbnail,
         processedImage,
+        isRemoveTool,
       });
     }
 
@@ -323,46 +328,70 @@ class ColoringPageMaker {
 
     this.canvas.addEventListener('click', () => {
       if (this.selectedStamp && this.previewPosition) {
-        // Remove any overlapping stamps before placing new one
-        const removedCount = this.removeOverlappingStamps(
-          this.previewPosition.x,
-          this.previewPosition.y
-        );
+        // Check if the selected stamp is the remove tool
+        if (this.selectedStamp.isRemoveTool) {
+          // Remove the topmost stamp at the click position
+          if (this.placedStamps.length > 0) {
+            // Remove the last stamp (topmost)
+            this.placedStamps.pop();
 
-        this.placedStamps.push({
-          stamp: this.selectedStamp,
-          x: this.previewPosition.x,
-          y: this.previewPosition.y,
-          sizeMultiplier: this.currentSizeMultiplier,
-        });
+            // Decrease rainbow progress by 10%
+            this.rainbowTargetProgress = Math.max(0, this.rainbowTargetProgress - 10);
 
-        // Play a silly sound
-        this.playSillySound();
+            // Start animating if not already
+            if (!this.isRainbowAnimating) {
+              this.isRainbowAnimating = true;
+              this.animateRainbowProgress();
+            }
 
-        // Randomize size for next placement (+/- 40%)
-        // Range: 0.6 to 1.4 (60% to 140% of original)
-        this.currentSizeMultiplier = 0.6 + Math.random() * 0.8;
+            // Play a silly sound
+            this.playSillySound();
 
-        // Only increment rainbow if no stamps were removed (not replacing)
-        if (removedCount === 0) {
-          // Increment rainbow target progress by 10%
-          const wasComplete = this.rainbowTargetProgress >= 100;
-          this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
+            this.render();
+          }
+        } else {
+          // Normal stamp placement logic
+          // Remove any overlapping stamps before placing new one
+          const removedCount = this.removeOverlappingStamps(
+            this.previewPosition.x,
+            this.previewPosition.y
+          );
 
-          // Start animating if not already
-          if (!this.isRainbowAnimating) {
-            this.isRainbowAnimating = true;
-            this.animateRainbowProgress();
+          this.placedStamps.push({
+            stamp: this.selectedStamp,
+            x: this.previewPosition.x,
+            y: this.previewPosition.y,
+            sizeMultiplier: this.currentSizeMultiplier,
+          });
+
+          // Play a silly sound
+          this.playSillySound();
+
+          // Randomize size for next placement (+/- 40%)
+          // Range: 0.6 to 1.4 (60% to 140% of original)
+          this.currentSizeMultiplier = 0.6 + Math.random() * 0.8;
+
+          // Only increment rainbow if no stamps were removed (not replacing)
+          if (removedCount === 0) {
+            // Increment rainbow target progress by 10%
+            const wasComplete = this.rainbowTargetProgress >= 100;
+            this.rainbowTargetProgress = Math.min(100, this.rainbowTargetProgress + 10);
+
+            // Start animating if not already
+            if (!this.isRainbowAnimating) {
+              this.isRainbowAnimating = true;
+              this.animateRainbowProgress();
+            }
+
+            // Trigger celebration when reaching 100%
+            if (!wasComplete && this.rainbowTargetProgress >= 100) {
+              // Delay celebration until animation completes
+              this.scheduleCelebration();
+            }
           }
 
-          // Trigger celebration when reaching 100%
-          if (!wasComplete && this.rainbowTargetProgress >= 100) {
-            // Delay celebration until animation completes
-            this.scheduleCelebration();
-          }
+          this.render();
         }
-
-        this.render();
       }
     });
   }

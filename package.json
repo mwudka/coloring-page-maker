@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "generate-tilesheet": "node scripts/generate-tilesheet.js",
+    "generate-streamdeck": "python generate_ulanzi_profile.py",
     "dev": "npm run generate-tilesheet && vite",
-    "build": "npm run generate-tilesheet && tsc && vite build",
+    "build": "npm run generate-tilesheet && npm run generate-streamdeck && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {

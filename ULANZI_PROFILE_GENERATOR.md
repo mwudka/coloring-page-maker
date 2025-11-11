@@ -5,9 +5,10 @@ This directory contains a standalone Python script that generates Ulanzi Stream 
 ## Features
 
 - Automatically generates a `.ulanziDeckProfile` file from stamp images
-- Configures 13 buttons (one per stamp)
+- Configures 13 buttons (12 stamps + 1 remove tool)
 - Maps each button to hotkeys `Ctrl+Alt+Shift+A` through `Ctrl+Alt+Shift+M`
 - Uses stamp images as button icons with automatic thumbnail generation
+- The 13th button (M) is the remove tool for deleting stamps
 
 ## Requirements
 
