@@ -33,6 +33,23 @@ class ColoringPageMaker {
   private isStarburstAnimating: boolean = false;
   private currentSizeMultiplier: number = 1.0; // Random size variation for next stamp placement
 
+  // Target height in inches for specific stamps (at 80 DPI canvas)
+  private stampTargetHeights: Record<string, number> = {
+    '1': 2.0,   // default
+    '2': 2.0,   // default
+    '3': 2.0,   // default
+    '4': 1.0,   // requested 1"
+    '5': 3.0,   // requested 3"
+    '6': 1.0,   // requested 1"
+    '7': 1.0,   // requested 1"
+    '8': 1.0,   // requested 1"
+    '9': 0.5,   // requested 0.5"
+    '10': 0.5,  // requested 0.5"
+    '11': 1.0,  // requested 1"
+    '12': 2.0,  // default
+    '13': 2.0,  // remove tool, default
+  };
+
   constructor() {
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d')!;
@@ -53,6 +70,15 @@ class ColoringPageMaker {
     await this.loadStamps();
     this.initializeStampList();
     this.render();
+  }
+
+  private getStampBaseScale(stamp: Stamp): number {
+    // Canvas is 680x880 pixels representing 8.5x11 inches = 80 DPI
+    // Calculate scale to achieve target height in inches
+    const targetHeightInches = this.stampTargetHeights[stamp.name] || 2.0; // default 2"
+    const targetHeightPixels = targetHeightInches * 80; // 80 DPI
+    const stampMaxDimension = stamp.size;
+    return targetHeightPixels / stampMaxDimension;
   }
 
   private async loadStamps(): Promise<void> {
@@ -450,8 +476,9 @@ class ColoringPageMaker {
       const stamp = placedStamp.stamp;
       const imgCanvas = stamp.processedImage!;
 
-      // Calculate size: scale to 1/3 of original size for higher DPI, then apply random multiplier
-      const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3) * placedStamp.sizeMultiplier;
+      // Calculate size: use per-stamp target height, then apply random multiplier
+      const baseScale = this.getStampBaseScale(stamp);
+      const scale = baseScale * placedStamp.sizeMultiplier;
       const width = imgCanvas.width * scale;
       const height = imgCanvas.height * scale;
 
@@ -547,14 +574,16 @@ class ColoringPageMaker {
     y2: number,
     sizeMultiplier2: number
   ): number {
-    // Calculate rendered dimensions (1/3 scale with size multiplier)
+    // Calculate rendered dimensions using per-stamp target heights with size multipliers
     const img1 = stamp1.processedImage!;
-    const scale1 = (stamp1.size / Math.max(img1.width, img1.height)) * (1/3) * sizeMultiplier1;
+    const baseScale1 = this.getStampBaseScale(stamp1);
+    const scale1 = baseScale1 * sizeMultiplier1;
     const width1 = img1.width * scale1;
     const height1 = img1.height * scale1;
 
     const img2 = stamp2.processedImage!;
-    const scale2 = (stamp2.size / Math.max(img2.width, img2.height)) * (1/3) * sizeMultiplier2;
+    const baseScale2 = this.getStampBaseScale(stamp2);
+    const scale2 = baseScale2 * sizeMultiplier2;
     const width2 = img2.width * scale2;
     const height2 = img2.height * scale2;
 
@@ -1000,8 +1029,9 @@ class ColoringPageMaker {
     // Use the cached processed image (background already removed)
     const imgCanvas = stamp.processedImage!;
 
-    // Calculate size: scale to 1/3 of original size for higher DPI on canvas, then apply random multiplier
-    const scale = (stamp.size / Math.max(imgCanvas.width, imgCanvas.height)) * (1/3) * sizeMultiplier;
+    // Calculate size: use per-stamp target height, then apply random multiplier
+    const baseScale = this.getStampBaseScale(stamp);
+    const scale = baseScale * sizeMultiplier;
     const width = imgCanvas.width * scale;
     const height = imgCanvas.height * scale;
 
