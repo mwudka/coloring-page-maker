@@ -321,10 +321,15 @@ class ColoringPageMaker {
       if (this.selectedStamp && this.previewPosition) {
         // Check if the selected stamp is the remove tool
         if (this.selectedStamp.isRemoveTool) {
-          // Remove the topmost stamp at the click position
-          if (this.placedStamps.length > 0) {
-            // Remove the last stamp (topmost)
-            this.placedStamps.pop();
+          // Find and remove the topmost stamp at the click position
+          const removedIndex = this.findStampAtPosition(
+            this.previewPosition.x,
+            this.previewPosition.y
+          );
+
+          if (removedIndex !== -1) {
+            // Remove the stamp at the found index
+            this.placedStamps.splice(removedIndex, 1);
 
             // Decrease rainbow progress by 10%
             this.rainbowTargetProgress = Math.max(0, this.rainbowTargetProgress - 10);
@@ -527,6 +532,34 @@ class ColoringPageMaker {
     });
 
     return beforeCount - this.placedStamps.length;
+  }
+
+  private findStampAtPosition(x: number, y: number): number {
+    // Search from end to beginning (topmost stamps first)
+    for (let i = this.placedStamps.length - 1; i >= 0; i--) {
+      const placedStamp = this.placedStamps[i];
+      const stamp = placedStamp.stamp;
+      const imgCanvas = stamp.processedImage!;
+
+      // Calculate rendered dimensions
+      const baseScale = this.getStampBaseScale(stamp);
+      const scale = baseScale * placedStamp.sizeMultiplier;
+      const width = imgCanvas.width * scale;
+      const height = imgCanvas.height * scale;
+
+      // Calculate bounding box (centered at stamp position)
+      const left = placedStamp.x - width / 2;
+      const right = placedStamp.x + width / 2;
+      const top = placedStamp.y - height / 2;
+      const bottom = placedStamp.y + height / 2;
+
+      // Check if position is within bounds
+      if (x >= left && x <= right && y >= top && y <= bottom) {
+        return i; // Found the topmost stamp at this position
+      }
+    }
+
+    return -1; // No stamp found at this position
   }
 
   private calculateStampOverlap(
