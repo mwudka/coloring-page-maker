@@ -286,9 +286,6 @@ class ColoringPageMaker {
         el.classList.remove('selected');
       }
     });
-
-    // Request pointer lock on canvas to confine cursor
-    this.canvas.requestPointerLock();
   }
 
   private deselectStamp(): void {
@@ -301,56 +298,24 @@ class ColoringPageMaker {
       el.classList.remove('selected');
     });
 
-    // Release pointer lock
-    document.exitPointerLock();
     this.render();
   }
 
   private setupCanvasEvents(): void {
-    // Track mouse movement with pointer lock
+    // Track mouse movement
     const handleMouseMove = (e: MouseEvent) => {
       if (this.selectedStamp) {
-        if (document.pointerLockElement === this.canvas) {
-          // Pointer is locked - use movement deltas
-          if (!this.previewPosition) {
-            // Initialize at center of canvas
-            this.previewPosition = {
-              x: this.canvas.width / 2,
-              y: this.canvas.height / 2,
-            };
-          }
-
-          // Update position based on movement
-          const newX = this.previewPosition.x + e.movementX;
-          const newY = this.previewPosition.y + e.movementY;
-
-          // Clamp to canvas bounds
-          this.previewPosition = {
-            x: Math.max(0, Math.min(this.canvas.width, newX)),
-            y: Math.max(0, Math.min(this.canvas.height, newY)),
-          };
-        } else {
-          // Pointer not locked yet - use regular coordinates
-          const rect = this.canvas.getBoundingClientRect();
-          this.previewPosition = {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          };
-        }
+        const rect = this.canvas.getBoundingClientRect();
+        this.previewPosition = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
         this.render();
       }
     };
 
-    // Use document-level mouse move to track cursor
-    document.addEventListener('mousemove', handleMouseMove);
-
-    // Handle pointer lock changes (e.g., user exits via browser UI)
-    document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement !== this.canvas && this.selectedStamp) {
-        // Pointer lock was released but stamp is still selected - deselect it
-        this.deselectStamp();
-      }
-    });
+    // Use canvas mouse move to track cursor
+    this.canvas.addEventListener('mousemove', handleMouseMove);
 
     this.canvas.addEventListener('click', () => {
       if (this.selectedStamp && this.previewPosition) {
@@ -1005,17 +970,6 @@ class ColoringPageMaker {
     this.placedStamps.forEach((placedStamp) => {
       this.drawStamp(placedStamp.stamp, placedStamp.x, placedStamp.y, 1.0, placedStamp.sizeMultiplier);
     });
-
-    // Draw preview (faint outline)
-    if (this.selectedStamp && this.previewPosition) {
-      this.drawStamp(
-        this.selectedStamp,
-        this.previewPosition.x,
-        this.previewPosition.y,
-        0.3,
-        this.currentSizeMultiplier
-      );
-    }
   }
 
   private drawStamp(stamp: Stamp, x: number, y: number, opacity: number, sizeMultiplier: number = 1.0): void {
