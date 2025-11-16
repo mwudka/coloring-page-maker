@@ -286,6 +286,9 @@ class ColoringPageMaker {
         el.classList.remove('selected');
       }
     });
+
+    // Request pointer lock to confine cursor
+    this.canvas.requestPointerLock();
   }
 
   private deselectStamp(): void {
@@ -298,6 +301,8 @@ class ColoringPageMaker {
       el.classList.remove('selected');
     });
 
+    // Release pointer lock
+    document.exitPointerLock();
     this.render();
   }
 
@@ -305,17 +310,47 @@ class ColoringPageMaker {
     // Track mouse movement
     const handleMouseMove = (e: MouseEvent) => {
       if (this.selectedStamp) {
-        const rect = this.canvas.getBoundingClientRect();
-        this.previewPosition = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        };
+        if (document.pointerLockElement === this.canvas) {
+          // Pointer is locked - use movement deltas
+          if (!this.previewPosition) {
+            // Initialize at center of canvas
+            this.previewPosition = {
+              x: this.canvas.width / 2,
+              y: this.canvas.height / 2,
+            };
+          }
+
+          // Update position based on movement
+          const newX = this.previewPosition.x + e.movementX;
+          const newY = this.previewPosition.y + e.movementY;
+
+          // Clamp to canvas bounds
+          this.previewPosition = {
+            x: Math.max(0, Math.min(this.canvas.width, newX)),
+            y: Math.max(0, Math.min(this.canvas.height, newY)),
+          };
+        } else {
+          // Pointer not locked yet - use regular coordinates
+          const rect = this.canvas.getBoundingClientRect();
+          this.previewPosition = {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+          };
+        }
         this.render();
       }
     };
 
-    // Use canvas mouse move to track cursor
-    this.canvas.addEventListener('mousemove', handleMouseMove);
+    // Use document-level mouse move to track cursor
+    document.addEventListener('mousemove', handleMouseMove);
+
+    // Handle pointer lock changes
+    document.addEventListener('pointerlockchange', () => {
+      if (document.pointerLockElement !== this.canvas && this.selectedStamp) {
+        // Pointer lock was released - deselect stamp
+        this.deselectStamp();
+      }
+    });
 
     this.canvas.addEventListener('click', () => {
       if (this.selectedStamp && this.previewPosition) {
@@ -1003,6 +1038,34 @@ class ColoringPageMaker {
     this.placedStamps.forEach((placedStamp) => {
       this.drawStamp(placedStamp.stamp, placedStamp.x, placedStamp.y, 1.0, placedStamp.sizeMultiplier);
     });
+
+    // Draw crosshair when stamp is selected
+    if (this.selectedStamp && this.previewPosition) {
+      this.drawCrosshair(this.previewPosition.x, this.previewPosition.y);
+    }
+  }
+
+  private drawCrosshair(x: number, y: number): void {
+    this.ctx.save();
+    this.ctx.strokeStyle = '#000000';
+    this.ctx.lineWidth = 2;
+    this.ctx.setLineDash([]);
+
+    const size = 20;
+
+    // Draw vertical line
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, y - size);
+    this.ctx.lineTo(x, y + size);
+    this.ctx.stroke();
+
+    // Draw horizontal line
+    this.ctx.beginPath();
+    this.ctx.moveTo(x - size, y);
+    this.ctx.lineTo(x + size, y);
+    this.ctx.stroke();
+
+    this.ctx.restore();
   }
 
   private drawStamp(stamp: Stamp, x: number, y: number, opacity: number, sizeMultiplier: number = 1.0): void {
