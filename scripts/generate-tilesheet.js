@@ -14,9 +14,9 @@ const METADATA_PATH = path.join(OUTPUT_DIR, 'tilesheet.json');
 async function generateTilesheet() {
   console.log('Generating tilesheet from stamps...');
 
-  // Get all stamp files
+  // Get all stamp files (14 total: stamps 1-12, 13=remove tool, 14)
   const stampFiles = [];
-  for (let i = 1; i <= 13; i++) {
+  for (let i = 1; i <= 14; i++) {
     stampFiles.push(`${i}.png`);
   }
 

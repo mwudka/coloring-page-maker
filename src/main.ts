@@ -33,6 +33,10 @@ class ColoringPageMaker {
   private isStarburstAnimating: boolean = false;
   private currentSizeMultiplier: number = 1.0; // Random size variation for next stamp placement
 
+  // Undo/Redo history
+  private history: PlacedStamp[][] = [[]]; // History of placed stamps states
+  private historyIndex: number = 0; // Current position in history
+
   // Target height in inches for specific stamps (at 80 DPI canvas)
   private stampTargetHeights: Record<string, number> = {
     '1': 2.0,   // default
@@ -47,7 +51,8 @@ class ColoringPageMaker {
     '10': 0.5,  // requested 0.5"
     '11': 1.0,  // requested 1"
     '12': 2.0,  // default
-    '13': 2.0,  // remove tool, default
+    '13': 2.0,  // default
+    '14': 2.0,  // remove tool, default
   };
 
   constructor() {
@@ -130,8 +135,8 @@ class ColoringPageMaker {
       // Use the maximum dimension of the processed image as the size
       const size = Math.max(processedImage.width, processedImage.height);
 
-      // Mark stamp 13 as the remove tool
-      const isRemoveTool = stampMeta.filename === '13.png';
+      // Mark stamp 14 as the remove tool
+      const isRemoveTool = stampMeta.filename === '14.png';
 
       stamps.push({
         id: stampMeta.id,
@@ -261,6 +266,11 @@ class ColoringPageMaker {
     const stampList = document.getElementById('stampList')!;
 
     this.stamps.forEach((stamp) => {
+      // Skip the remove tool in the toolstrip
+      if (stamp.isRemoveTool) {
+        return;
+      }
+
       const stampElement = document.createElement('div');
       stampElement.className = 'stamp-item';
 
@@ -379,6 +389,9 @@ class ColoringPageMaker {
             this.playSillySound();
 
             this.render();
+
+            // Save state for undo/redo
+            this.saveState();
           }
         } else {
           // Normal stamp placement logic
@@ -422,6 +435,9 @@ class ColoringPageMaker {
           }
 
           this.render();
+
+          // Save state for undo/redo
+          this.saveState();
         }
       }
     });
@@ -436,10 +452,43 @@ class ColoringPageMaker {
 
   private setupKeyboardShortcuts(): void {
     document.addEventListener('keydown', (e) => {
+      // Ctrl+P to print
+      if (e.ctrlKey && e.key === 'p') {
+        e.preventDefault();
+        this.generatePDF();
+        console.log('Print triggered');
+        return;
+      }
+
+      // Ctrl+Z to undo
+      if (e.ctrlKey && !e.shiftKey && e.key === 'z') {
+        e.preventDefault();
+        this.undo();
+        return;
+      }
+
+      // Ctrl+Y to redo (also Ctrl+Shift+Z)
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        this.redo();
+        return;
+      }
+
       // Escape key to deselect stamp
       if (e.key === 'Escape') {
         e.preventDefault();
         this.deselectStamp();
+        return;
+      }
+
+      // Delete or Backspace key to switch to delete tool
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        const deleteTool = this.stamps.find(s => s.isRemoveTool);
+        if (deleteTool) {
+          this.selectStamp(deleteTool);
+          console.log('Delete tool activated');
+        }
         return;
       }
 
@@ -456,6 +505,61 @@ class ColoringPageMaker {
         }
       }
     });
+  }
+
+  private saveState(): void {
+    // Deep copy the current placedStamps array
+    const stateCopy = this.placedStamps.map(ps => ({
+      stamp: ps.stamp,
+      x: ps.x,
+      y: ps.y,
+      sizeMultiplier: ps.sizeMultiplier
+    }));
+
+    // Remove any future history (if we're not at the end)
+    this.history = this.history.slice(0, this.historyIndex + 1);
+
+    // Add new state
+    this.history.push(stateCopy);
+    this.historyIndex++;
+
+    // Limit history to 50 states to prevent memory issues
+    if (this.history.length > 50) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+  }
+
+  private undo(): void {
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.placedStamps = this.history[this.historyIndex].map(ps => ({
+        stamp: ps.stamp,
+        x: ps.x,
+        y: ps.y,
+        sizeMultiplier: ps.sizeMultiplier
+      }));
+      this.render();
+      console.log(`Undo: now at history index ${this.historyIndex}`);
+    } else {
+      console.log('Nothing to undo');
+    }
+  }
+
+  private redo(): void {
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.placedStamps = this.history[this.historyIndex].map(ps => ({
+        stamp: ps.stamp,
+        x: ps.x,
+        y: ps.y,
+        sizeMultiplier: ps.sizeMultiplier
+      }));
+      this.render();
+      console.log(`Redo: now at history index ${this.historyIndex}`);
+    } else {
+      console.log('Nothing to redo');
+    }
   }
 
   private generatePDF(): void {

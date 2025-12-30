@@ -39,7 +39,11 @@ except ImportError:
 def get_stamp_images(stamps_dir: Path) -> list[tuple[int, Path]]:
     """Get list of stamp images from the public/stamps directory."""
     stamp_images = []
-    for i in range(1, 14):  # 13 stamps
+    for i in range(1, 15):  # 14 stamps total
+        # Skip stamp 14 (remove tool)
+        if i == 14:
+            continue
+
         img_path = stamps_dir / f"{i}.png"
         if img_path.exists():
             stamp_images.append((i, img_path))
@@ -153,11 +157,11 @@ def generate_profile(stamps_dir: Path, output_file: Path, device_model: str = "D
         actions = {}
 
         # Ulanzi deck layout: typically 5 columns x 3 rows (15 buttons)
-        # We'll place the 13 stamps in reading order
+        # We'll place the 13 coloring stamps in reading order (excluding stamp 14 remove tool)
         hotkey_letters = 'ABCDEFGHIJKLM'
 
         for idx, (stamp_num, stamp_path) in enumerate(stamp_images):
-            if idx >= 13:  # Only 13 stamps
+            if idx >= 13:  # 13 coloring stamps (stamps 1-13, excluding stamp 14 remove tool)
                 break
 
             # Calculate grid position (col, row) - Ulanzi uses col_row format

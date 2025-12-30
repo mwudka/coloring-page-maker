@@ -10,7 +10,18 @@
       "Bash(cat:*)",
       "Bash(python -m json.tool:*)",
       "Bash(python generate_ulanzi_profile.py:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(gh run:*)",
+      "Bash(curl:*)",
+      "Bash(git push)",
+      "Bash(npm run generate-tilesheet:*)",
+      "Bash(npm run preview:*)",
+      "Bash(pkill:*)",
+      "Bash(python resize_image.py:*)",
+      "Bash(python:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run generate-streamdeck:*)",
+      "WebFetch(domain:ai.google.dev)"
     ],
     "deny": [],
     "ask": []
